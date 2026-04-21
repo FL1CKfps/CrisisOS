@@ -1,0 +1,200 @@
+Starting a Gradle Daemon, 1 busy and 1 incompatible and 2 stopped Daemons could not be reused, use --status for details
+
+> Configure project :app
+WARNING: The option setting 'android.disallowKotlinSourceSets=false' is experimental.
+The current default is 'true'.
+WARNING: The option setting 'android.newDsl=false' is deprecated.
+The current default is 'true'.
+It will be removed in version 10.0 of the Android Gradle plugin.
+
+> Task :app:clean
+> Task :app:preBuild UP-TO-DATE
+> Task :app:preDebugBuild UP-TO-DATE
+> Task :app:mergeDebugNativeDebugMetadata NO-SOURCE
+> Task :app:generateDebugBuildConfig
+> Task :app:generateDebugResources
+> Task :app:packageDebugResources
+> Task :app:processDebugNavigationResources
+> Task :app:generateDebugAssets UP-TO-DATE
+> Task :app:javaPreCompileDebug
+> Task :app:parseDebugLocalResources
+> Task :app:mergeDebugAssets
+> Task :app:compressDebugAssets
+> Task :app:generateDebugRFile
+> Task :app:checkDebugDuplicateClasses
+> Task :app:desugarDebugFileDependencies
+> Task :app:mergeLibDexDebug
+> Task :app:mapDebugSourceSetPaths
+> Task :app:compileDebugNavigationResources
+> Task :app:checkDebugAarMetadata
+> Task :app:createDebugCompatibleScreenManifests
+> Task :app:extractDeepLinksDebug
+> Task :app:mergeDebugResources
+> Task :app:processDebugMainManifest
+> Task :app:processDebugManifest
+> Task :app:mergeDebugJniLibFolders
+> Task :app:processDebugManifestForPackage
+> Task :app:mergeDebugNativeLibs
+
+> Task :app:stripDebugDebugSymbols
+Unable to strip the following libraries, packaging them as they are: libandroidx.graphics.path.so, libdatastore_shared_counter.so. Run with --info option to learn more.
+
+> Task :app:validateSigningDebug
+> Task :app:writeDebugAppMetadata
+> Task :app:writeDebugSigningConfigVersions
+> Task :app:processDebugResources
+> Task :app:mergeExtDexDebug
+> Task :app:kspDebugKotlin
+> Task :app:compileDebugKotlin
+w: file:///C:/Users/visha/AndroidStudioProjects/crisis%20os/app/src/main/java/com/elv8/crisisos/core/notification/NotificationBuilder.kt:22:5 This annotation is currently applied to the value parameter only, but in the future it will also be applied to field.
+- To opt in to applying to both value parameter and field, add '-Xannotation-default-target=param-property' to your compiler arguments.
+- To keep applying to the value parameter only, use the '@param:' annotation target.
+
+See https://youtrack.jetbrains.com/issue/KT-73255 for more details.
+w: file:///C:/Users/visha/AndroidStudioProjects/crisis%20os/app/src/main/java/com/elv8/crisisos/core/notification/NotificationHandler.kt:186:13 'when' is exhaustive so 'else' is redundant here.
+w: file:///C:/Users/visha/AndroidStudioProjects/crisis%20os/app/src/main/java/com/elv8/crisisos/core/notification/NotificationManagerWrapper.kt:25:5 This annotation is currently applied to the value parameter only, but in the future it will also be applied to field.
+- To opt in to applying to both value parameter and field, add '-Xannotation-default-target=param-property' to your compiler arguments.
+- To keep applying to the value parameter only, use the '@param:' annotation target.
+
+See https://youtrack.jetbrains.com/issue/KT-73255 for more details.
+w: file:///C:/Users/visha/AndroidStudioProjects/crisis%20os/app/src/main/java/com/elv8/crisisos/core/notification/NotificationSettings.kt:17:5 This annotation is currently applied to the value parameter only, but in the future it will also be applied to field.
+- To opt in to applying to both value parameter and field, add '-Xannotation-default-target=param-property' to your compiler arguments.
+- To keep applying to the value parameter only, use the '@param:' annotation target.
+
+See https://youtrack.jetbrains.com/issue/KT-73255 for more details.
+w: file:///C:/Users/visha/AndroidStudioProjects/crisis%20os/app/src/main/java/com/elv8/crisisos/core/permissions/MediaPermissionManager.kt:16:5 This annotation is currently applied to the value parameter only, but in the future it will also be applied to field.
+- To opt in to applying to both value parameter and field, add '-Xannotation-default-target=param-property' to your compiler arguments.
+- To keep applying to the value parameter only, use the '@param:' annotation target.
+
+See https://youtrack.jetbrains.com/issue/KT-73255 for more details.
+w: file:///C:/Users/visha/AndroidStudioProjects/crisis%20os/app/src/main/java/com/elv8/crisisos/core/permissions/MeshPermissionManager.kt:16:4 This annotation is currently applied to the value parameter only, but in the future it will also be applied to field.
+- To opt in to applying to both value parameter and field, add '-Xannotation-default-target=param-property' to your compiler arguments.
+- To keep applying to the value parameter only, use the '@param:' annotation target.
+
+See https://youtrack.jetbrains.com/issue/KT-73255 for more details.
+w: file:///C:/Users/visha/AndroidStudioProjects/crisis%20os/app/src/main/java/com/elv8/crisisos/core/recovery/MeshRecoveryManager.kt:37:5 This annotation is currently applied to the value parameter only, but in the future it will also be applied to field.
+- To opt in to applying to both value parameter and field, add '-Xannotation-default-target=param-property' to your compiler arguments.
+- To keep applying to the value parameter only, use the '@param:' annotation target.
+
+See https://youtrack.jetbrains.com/issue/KT-73255 for more details.
+w: file:///C:/Users/visha/AndroidStudioProjects/crisis%20os/app/src/main/java/com/elv8/crisisos/data/media/AudioPlayer.kt:34:5 This annotation is currently applied to the value parameter only, but in the future it will also be applied to field.
+- To opt in to applying to both value parameter and field, add '-Xannotation-default-target=param-property' to your compiler arguments.
+- To keep applying to the value parameter only, use the '@param:' annotation target.
+
+See https://youtrack.jetbrains.com/issue/KT-73255 for more details.
+w: file:///C:/Users/visha/AndroidStudioProjects/crisis%20os/app/src/main/java/com/elv8/crisisos/data/media/MediaFileManager.kt:25:5 This annotation is currently applied to the value parameter only, but in the future it will also be applied to field.
+- To opt in to applying to both value parameter and field, add '-Xannotation-default-target=param-property' to your compiler arguments.
+- To keep applying to the value parameter only, use the '@param:' annotation target.
+
+See https://youtrack.jetbrains.com/issue/KT-73255 for more details.
+w: file:///C:/Users/visha/AndroidStudioProjects/crisis%20os/app/src/main/java/com/elv8/crisisos/data/media/MediaPickerHelper.kt:24:5 This annotation is currently applied to the value parameter only, but in the future it will also be applied to field.
+- To opt in to applying to both value parameter and field, add '-Xannotation-default-target=param-property' to your compiler arguments.
+- To keep applying to the value parameter only, use the '@param:' annotation target.
+
+See https://youtrack.jetbrains.com/issue/KT-73255 for more details.
+w: file:///C:/Users/visha/AndroidStudioProjects/crisis%20os/app/src/main/java/com/elv8/crisisos/data/media/VoiceRecorder.kt:37:5 This annotation is currently applied to the value parameter only, but in the future it will also be applied to field.
+- To opt in to applying to both value parameter and field, add '-Xannotation-default-target=param-property' to your compiler arguments.
+- To keep applying to the value parameter only, use the '@param:' annotation target.
+
+See https://youtrack.jetbrains.com/issue/KT-73255 for more details.
+w: file:///C:/Users/visha/AndroidStudioProjects/crisis%20os/app/src/main/java/com/elv8/crisisos/data/mesh/MeshMessenger.kt:54:5 This annotation is currently applied to the value parameter only, but in the future it will also be applied to field.
+- To opt in to applying to both value parameter and field, add '-Xannotation-default-target=param-property' to your compiler arguments.
+- To keep applying to the value parameter only, use the '@param:' annotation target.
+
+See https://youtrack.jetbrains.com/issue/KT-73255 for more details.
+w: file:///C:/Users/visha/AndroidStudioProjects/crisis%20os/app/src/main/java/com/elv8/crisisos/data/mesh/MeshMessenger.kt:481:42 'fun asJavaFile(): File?' is deprecated. Deprecated in Java.
+w: file:///C:/Users/visha/AndroidStudioProjects/crisis%20os/app/src/main/java/com/elv8/crisisos/data/mesh/MeshMessenger.kt:488:21 Condition is always 'true'.
+w: file:///C:/Users/visha/AndroidStudioProjects/crisis%20os/app/src/main/java/com/elv8/crisisos/data/repository/CheckpointRepository.kt:30:5 This annotation is currently applied to the value parameter only, but in the future it will also be applied to field.
+- To opt in to applying to both value parameter and field, add '-Xannotation-default-target=param-property' to your compiler arguments.
+- To keep applying to the value parameter only, use the '@param:' annotation target.
+
+See https://youtrack.jetbrains.com/issue/KT-73255 for more details.
+w: file:///C:/Users/visha/AndroidStudioProjects/crisis%20os/app/src/main/java/com/elv8/crisisos/data/repository/DangerZoneRepository.kt:30:5 This annotation is currently applied to the value parameter only, but in the future it will also be applied to field.
+- To opt in to applying to both value parameter and field, add '-Xannotation-default-target=param-property' to your compiler arguments.
+- To keep applying to the value parameter only, use the '@param:' annotation target.
+
+See https://youtrack.jetbrains.com/issue/KT-73255 for more details.
+w: file:///C:/Users/visha/AndroidStudioProjects/crisis%20os/app/src/main/java/com/elv8/crisisos/data/repository/LocationRepositoryImpl.kt:29:5 This annotation is currently applied to the value parameter only, but in the future it will also be applied to field.
+- To opt in to applying to both value parameter and field, add '-Xannotation-default-target=param-property' to your compiler arguments.
+- To keep applying to the value parameter only, use the '@param:' annotation target.
+
+See https://youtrack.jetbrains.com/issue/KT-73255 for more details.
+w: file:///C:/Users/visha/AndroidStudioProjects/crisis%20os/app/src/main/java/com/elv8/crisisos/data/repository/MediaRepositoryImpl.kt:27:5 This annotation is currently applied to the value parameter only, but in the future it will also be applied to field.
+- To opt in to applying to both value parameter and field, add '-Xannotation-default-target=param-property' to your compiler arguments.
+- To keep applying to the value parameter only, use the '@param:' annotation target.
+
+See https://youtrack.jetbrains.com/issue/KT-73255 for more details.
+w: file:///C:/Users/visha/AndroidStudioProjects/crisis%20os/app/src/main/java/com/elv8/crisisos/data/repository/MissingPersonRepositoryImpl.kt:47:28 This is a delicate API and its use requires care. Make sure you fully read and understand documentation of the declaration that is marked as a delicate API.
+w: file:///C:/Users/visha/AndroidStudioProjects/crisis%20os/app/src/main/java/com/elv8/crisisos/ui/components/BottomNavItem.kt:23:71 'val Icons.Filled.Chat: ImageVector' is deprecated. Use the AutoMirrored version at Icons.AutoMirrored.Filled.Chat.
+w: file:///C:/Users/visha/AndroidStudioProjects/crisis%20os/app/src/main/java/com/elv8/crisisos/ui/components/BottomNavItem.kt:23:92 'val Icons.Outlined.Chat: ImageVector' is deprecated. Use the AutoMirrored version at Icons.AutoMirrored.Outlined.Chat.
+w: file:///C:/Users/visha/AndroidStudioProjects/crisis%20os/app/src/main/java/com/elv8/crisisos/ui/components/PulsingDot.kt:85:35 'fun KeyframesSpec.KeyframeEntity<Float>.with(easing: Easing): Unit' is deprecated. Use version that returns an instance of the entity so it can be re-used in other keyframe builders.
+w: file:///C:/Users/visha/AndroidStudioProjects/crisis%20os/app/src/main/java/com/elv8/crisisos/ui/components/PulsingDot.kt:86:49 'fun KeyframesSpec.KeyframeEntity<Float>.with(easing: Easing): Unit' is deprecated. Use version that returns an instance of the entity so it can be re-used in other keyframe builders.
+w: file:///C:/Users/visha/AndroidStudioProjects/crisis%20os/app/src/main/java/com/elv8/crisisos/ui/components/PulsingDot.kt:87:49 'fun KeyframesSpec.KeyframeEntity<Float>.with(easing: Easing): Unit' is deprecated. Use version that returns an instance of the entity so it can be re-used in other keyframe builders.
+w: file:///C:/Users/visha/AndroidStudioProjects/crisis%20os/app/src/main/java/com/elv8/crisisos/ui/screens/chat/ChatScreen.kt:70:41 'val Icons.Filled.Chat: ImageVector' is deprecated. Use the AutoMirrored version at Icons.AutoMirrored.Filled.Chat.
+w: file:///C:/Users/visha/AndroidStudioProjects/crisis%20os/app/src/main/java/com/elv8/crisisos/ui/screens/chat/ChatViewModel.kt:34:5 This annotation is currently applied to the value parameter only, but in the future it will also be applied to field.
+- To opt in to applying to both value parameter and field, add '-Xannotation-default-target=param-property' to your compiler arguments.
+- To keep applying to the value parameter only, use the '@param:' annotation target.
+
+See https://youtrack.jetbrains.com/issue/KT-73255 for more details.
+w: file:///C:/Users/visha/AndroidStudioProjects/crisis%20os/app/src/main/java/com/elv8/crisisos/ui/screens/chatv2/ChatListScreen.kt:255:5 'fun Divider(modifier: Modifier = ..., thickness: Dp = ..., color: Color = ...): Unit' is deprecated. Renamed to HorizontalDivider.
+w: file:///C:/Users/visha/AndroidStudioProjects/crisis%20os/app/src/main/java/com/elv8/crisisos/ui/screens/chatv2/ChatThreadViewModel.kt:57:5 This annotation is currently applied to the value parameter only, but in the future it will also be applied to field.
+- To opt in to applying to both value parameter and field, add '-Xannotation-default-target=param-property' to your compiler arguments.
+- To keep applying to the value parameter only, use the '@param:' annotation target.
+
+See https://youtrack.jetbrains.com/issue/KT-73255 for more details.
+w: file:///C:/Users/visha/AndroidStudioProjects/crisis%20os/app/src/main/java/com/elv8/crisisos/ui/screens/connection/IncomingRequestsScreen.kt:120:148 'val Icons.Filled.Send: ImageVector' is deprecated. Use the AutoMirrored version at Icons.AutoMirrored.Filled.Send.
+w: file:///C:/Users/visha/AndroidStudioProjects/crisis%20os/app/src/main/java/com/elv8/crisisos/ui/screens/connection/IncomingRequestsScreen.kt:307:21 'when' is exhaustive so 'else' is redundant here.
+w: file:///C:/Users/visha/AndroidStudioProjects/crisis%20os/app/src/main/java/com/elv8/crisisos/ui/screens/contacts/ContactsScreen.kt:38:43 'val Icons.Filled.ArrowBack: ImageVector' is deprecated. Use the AutoMirrored version at Icons.AutoMirrored.Filled.ArrowBack.
+w: file:///C:/Users/visha/AndroidStudioProjects/crisis%20os/app/src/main/java/com/elv8/crisisos/ui/screens/contacts/ContactsScreen.kt:300:21 'fun Divider(modifier: Modifier = ..., thickness: Dp = ..., color: Color = ...): Unit' is deprecated. Renamed to HorizontalDivider.
+w: file:///C:/Users/visha/AndroidStudioProjects/crisis%20os/app/src/main/java/com/elv8/crisisos/ui/screens/deadman/DeadManViewModel.kt:41:5 This annotation is currently applied to the value parameter only, but in the future it will also be applied to field.
+- To opt in to applying to both value parameter and field, add '-Xannotation-default-target=param-property' to your compiler arguments.
+- To keep applying to the value parameter only, use the '@param:' annotation target.
+
+See https://youtrack.jetbrains.com/issue/KT-73255 for more details.
+w: file:///C:/Users/visha/AndroidStudioProjects/crisis%20os/app/src/main/java/com/elv8/crisisos/ui/screens/home/HomeScreen.kt:275:37 'val Icons.Filled.Chat: ImageVector' is deprecated. Use the AutoMirrored version at Icons.AutoMirrored.Filled.Chat.
+w: file:///C:/Users/visha/AndroidStudioProjects/crisis%20os/app/src/main/java/com/elv8/crisisos/ui/screens/home/HomeViewModel.kt:39:5 This annotation is currently applied to the value parameter only, but in the future it will also be applied to field.
+- To opt in to applying to both value parameter and field, add '-Xannotation-default-target=param-property' to your compiler arguments.
+- To keep applying to the value parameter only, use the '@param:' annotation target.
+
+See https://youtrack.jetbrains.com/issue/KT-73255 for more details.
+w: file:///C:/Users/visha/AndroidStudioProjects/crisis%20os/app/src/main/java/com/elv8/crisisos/ui/screens/home/MoreScreen.kt:59:90 'val Icons.Filled.Chat: ImageVector' is deprecated. Use the AutoMirrored version at Icons.AutoMirrored.Filled.Chat.
+w: file:///C:/Users/visha/AndroidStudioProjects/crisis%20os/app/src/main/java/com/elv8/crisisos/ui/screens/home/MoreScreen.kt:68:79 'val Icons.Filled.FactCheck: ImageVector' is deprecated. Use the AutoMirrored version at Icons.AutoMirrored.Filled.FactCheck.
+w: file:///C:/Users/visha/AndroidStudioProjects/crisis%20os/app/src/main/java/com/elv8/crisisos/ui/screens/mesh/MeshViewModel.kt:18:5 This annotation is currently applied to the value parameter only, but in the future it will also be applied to field.
+- To opt in to applying to both value parameter and field, add '-Xannotation-default-target=param-property' to your compiler arguments.
+- To keep applying to the value parameter only, use the '@param:' annotation target.
+
+See https://youtrack.jetbrains.com/issue/KT-73255 for more details.
+w: file:///C:/Users/visha/AndroidStudioProjects/crisis%20os/app/src/main/java/com/elv8/crisisos/ui/screens/onboarding/OnboardingViewModel.kt:22:5 This annotation is currently applied to the value parameter only, but in the future it will also be applied to field.
+- To opt in to applying to both value parameter and field, add '-Xannotation-default-target=param-property' to your compiler arguments.
+- To keep applying to the value parameter only, use the '@param:' annotation target.
+
+See https://youtrack.jetbrains.com/issue/KT-73255 for more details.
+w: file:///C:/Users/visha/AndroidStudioProjects/crisis%20os/app/src/main/java/com/elv8/crisisos/ui/screens/settings/SettingsViewModel.kt:32:5 This annotation is currently applied to the value parameter only, but in the future it will also be applied to field.
+- To opt in to applying to both value parameter and field, add '-Xannotation-default-target=param-property' to your compiler arguments.
+- To keep applying to the value parameter only, use the '@param:' annotation target.
+
+See https://youtrack.jetbrains.com/issue/KT-73255 for more details.
+w: file:///C:/Users/visha/AndroidStudioProjects/crisis%20os/app/src/main/java/com/elv8/crisisos/ui/screens/sos/SosScreen.kt:113:103 'val Icons.Filled.ArrowBack: ImageVector' is deprecated. Use the AutoMirrored version at Icons.AutoMirrored.Filled.ArrowBack.
+w: file:///C:/Users/visha/AndroidStudioProjects/crisis%20os/app/src/main/java/com/elv8/crisisos/ui/screens/sos/SosViewModel.kt:59:5 This annotation is currently applied to the value parameter only, but in the future it will also be applied to field.
+- To opt in to applying to both value parameter and field, add '-Xannotation-default-target=param-property' to your compiler arguments.
+- To keep applying to the value parameter only, use the '@param:' annotation target.
+
+See https://youtrack.jetbrains.com/issue/KT-73255 for more details.
+w: file:///C:/Users/visha/AndroidStudioProjects/crisis%20os/app/src/main/java/com/elv8/crisisos/ui/screens/supply/SupplyScreen.kt:378:34 'val Icons.Filled.ListAlt: ImageVector' is deprecated. Use the AutoMirrored version at Icons.AutoMirrored.Filled.ListAlt.
+w: file:///C:/Users/visha/AndroidStudioProjects/crisis%20os/app/src/main/java/com/elv8/crisisos/ui/theme/Theme.kt:40:20 'var statusBarColor: Int' is deprecated. Deprecated in Java.
+
+> Task :app:compileDebugJavaWithJavac
+> Task :app:hiltAggregateDepsDebug
+> Task :app:hiltJavaCompileDebug
+> Task :app:processDebugJavaRes
+> Task :app:transformDebugClassesWithAsm
+> Task :app:mergeDebugJavaResource
+> Task :app:dexBuilderDebug
+> Task :app:mergeProjectDexDebug
+> Task :app:packageDebug
+> Task :app:createDebugApkListingFileRedirect
+> Task :app:assembleDebug
+
+BUILD SUCCESSFUL in 2m 12s
+42 actionable tasks: 42 executed
+Consider enabling configuration cache to speed up this build: https://docs.gradle.org/9.3.1/userguide/configuration_cache_enabling.html
