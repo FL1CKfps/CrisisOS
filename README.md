@@ -63,46 +63,6 @@ The project follows a layered Clean Architecture model, ensuring clear separatio
 ```
 UI → UseCase → Repository → Data / Device
 ```
-```mermaid
-flowchart LR
-    UI[UI Layer]
-    UC[UseCase Layer]
-    REPO[Repository Layer]
-    DATA[Data Layer]
-
-    UI --> UC
-    UC --> REPO
-    REPO --> DATA
-
-```mermaid
-    flowchart TB
-
-    subgraph UI
-        VM[ViewModels]
-        UIComp[Compose Screens]
-    end
-
-    subgraph Domain
-        UC[UseCases]
-        MODEL[Models]
-    end
-
-    subgraph Data
-        REPO_IMPL[Repositories]
-        DAO[Room DAO]
-        ENTITY[Entities]
-    end
-
-    subgraph Device
-        MESH[Mesh Layer]
-        SERVICE[Services]
-    end
-
-    UIComp --> VM
-    VM --> UC
-    UC --> REPO_IMPL
-    REPO_IMPL --> DAO
-    REPO_IMPL --> MESH
 
 ### 🔹 UI Layer
 
@@ -144,23 +104,6 @@ flowchart LR
 7. Data is stored and UI updates reactively
 
 ---
-```mermaid
-sequenceDiagram
-    participant User
-    participant UI
-    participant VM
-    participant UC
-    participant Repo
-    participant Mesh
-
-    User->>UI: Send message
-    UI->>VM: trigger
-    VM->>UC: invoke
-    UC->>Repo: send
-    Repo->>Mesh: transmit
-    Mesh-->>Repo: receive
-    Repo-->>VM: update
-    VM-->>UI: render
 
 ## 🧩 Key Components
 
