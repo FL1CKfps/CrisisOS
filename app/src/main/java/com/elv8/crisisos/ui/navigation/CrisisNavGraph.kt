@@ -23,7 +23,6 @@ import com.elv8.crisisos.ui.screens.discovery.PeerDiscoveryScreen
 import com.elv8.crisisos.ui.screens.aiassistant.AiAssistantScreen
 import com.elv8.crisisos.ui.screens.chat.ChatListScreen
 import com.elv8.crisisos.ui.screens.chat.ChatThreadScreen
-import com.elv8.crisisos.ui.screens.childalert.ChildAlertScreen
 import com.elv8.crisisos.ui.screens.checkpoint.CheckpointScreen
 import com.elv8.crisisos.ui.screens.fakenews.FakeNewsScreen
 import com.elv8.crisisos.ui.screens.dangerzone.DangerZoneScreen
@@ -156,7 +155,10 @@ fun CrisisNavGraph(
             DeconflictionScreen(onNavigateBack = { navController.popBackStack() }) 
         }
         composable(Screen.ChildAlert.route) {
-            ChildAlertScreen(onNavigateBack = { navController.popBackStack() }) 
+            // Child Alert was merged into the unified CRS-ID lookup. Re-route legacy entry points
+            // (notification deep-links, drawer history) to the Missing Person screen so users
+            // land on the new Watches surface that absorbs the Child Alert flow.
+            MissingPersonScreen(onNavigateBack = { navController.popBackStack() })
         }
         composable(Screen.CrisisNews.route) {
             CrisisNewsScreen(onNavigateBack = { navController.popBackStack() })

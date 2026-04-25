@@ -12,7 +12,6 @@ import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.itemsIndexed
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Chat
-import androidx.compose.material.icons.filled.ChildCare
 import androidx.compose.material.icons.filled.FactCheck
 import androidx.compose.material.icons.filled.Gavel
 import androidx.compose.material.icons.filled.Inventory
@@ -59,7 +58,7 @@ fun MoreScreen(
             FeatureItem("1", "Mesh Chat", "Offline peer-to-peer messaging", Icons.Filled.Chat, Screen.ChatHub.route, FeatureStatus.OFFLINE_READY),
             FeatureItem("2", "SOS Broadcast", "Multi-hop emergency alert", Icons.Filled.Warning, Screen.Sos.route, FeatureStatus.AVAILABLE),
             FeatureItem("3", "Dead Man's Switch", "Auto-alert on no check-in", Icons.Filled.Timer, Screen.DeadManSwitch.route, FeatureStatus.BETA),
-            FeatureItem("4", "Missing Person", "Find family via mesh", Icons.Filled.PersonSearch, Screen.MissingPerson.route, FeatureStatus.BETA),
+            FeatureItem("4", "Find Person", "CRS-ID lookup + child watches", Icons.Filled.PersonSearch, Screen.MissingPerson.route, FeatureStatus.BETA),
             FeatureItem("5", "Supply Request", "Request aid offline", Icons.Filled.Inventory, Screen.Supply().route, FeatureStatus.AVAILABLE),
             FeatureItem("6", "Offline Maps", "Safe zones, no internet", Icons.Filled.Map, Screen.Maps.route, FeatureStatus.OFFLINE_READY),
             FeatureItem("7", "Danger Zone", "Live threat detection", Icons.Filled.LocationOff, Screen.DangerZone.route, FeatureStatus.BETA),
@@ -67,7 +66,6 @@ fun MoreScreen(
             FeatureItem("9", "AI Assistant", "On-device Gemma 4 E2B", Icons.Filled.Psychology, Screen.AiAssistant.route, FeatureStatus.AVAILABLE),
             FeatureItem("10", "Fake News", "Verify information", Icons.Filled.FactCheck, Screen.FakeNews.route, FeatureStatus.BETA),
             FeatureItem("11", "Deconfliction", "Geneva protocol reports", Icons.Filled.Gavel, Screen.Deconfliction.route, FeatureStatus.COMING_SOON),
-            FeatureItem("12", "Child Alert", "Separation alert system", Icons.Filled.ChildCare, Screen.ChildAlert.route, FeatureStatus.BETA),
             FeatureItem("15", "My Contacts", "Manage trusted peers and groups", Icons.Filled.Contacts, Screen.Contacts.route, FeatureStatus.AVAILABLE)
         )
     }
@@ -82,7 +80,7 @@ fun MoreScreen(
         item(span = { GridItemSpan(2) }) {
             SectionHeader(
                 title = "All Features",
-                subtitle = "12 offline-first survival tools"
+                subtitle = "Offline-first survival tools"
             )
         }
 

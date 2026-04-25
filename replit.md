@@ -122,3 +122,52 @@ Features:
 - App-action tags `[ACTION:SUPPLY_REQUEST|OFFLINE_MAPS|MISSING_PERSON|SOS|
   CHECKPOINT_INTEL|CRISIS_NEWS]` parsed by the ViewModel and surfaced as
   one-tap chips that navigate to the relevant feature
+
+## SOS Broadcast (Feature 4)
+
+Lives in `ui/screens/sos/SosScreen.kt` + `SosViewModel.kt`.
+
+UX flow per CrisisOS spec:
+- **Hold-to-broadcast (2s)** with a circular progress ring around the red
+  button + haptic kick-off. Releasing early cancels the gesture; reaching 100%
+  opens the confirmation dialog.
+- **Confirmation dialog** shows exactly what will be sent — own CRS ID, type,
+  GPS coordinates (or last-known fix flagged "approximate" when GPS is stale
+  >5 min or unavailable), and the message — so the user has one final review
+  step before the packet hits the mesh.
+- **Auto-repeat every 10 minutes** (`REPEAT_INTERVAL_MS`). The broadcasting
+  panel shows a live mm:ss countdown to the next repeat plus elapsed-active
+  duration so the user can confirm the alert is still active.
+- **10-min cooldown** after the user taps "MARK SAFE & STOP" — sends a
+  SOS_CANCEL packet, blocks new broadcasts for `COOLDOWN_MS`, and shows an
+  amber banner with a live countdown so accidental retriggers are impossible.
+- **Type chips** (Medical / Trapped / Missing / Armed Threat / Fire / General)
+  pre-fill the message with a quick phrase the user can edit.
+- The viewmodel suppresses its own SOS notification group while broadcasting
+  so the user doesn't see a "you sent yourself an SOS" toast loop.
+
+## CRS-ID Lookup (Missing Person + Child Alert merged — Feature 6)
+
+Lives in `ui/screens/missingperson/MissingPersonScreen.kt` +
+`MissingPersonViewModel.kt`. The legacy ChildAlert screen has been deleted;
+`Screen.ChildAlert` is preserved as a navigation alias that routes to the new
+unified screen so notification deep-links keep working.
+
+Two tabs:
+- **Search** — pure CRS-ID lookup (regex `^[A-Z]{2,4}-\d{6,8}$`). On submit it
+  reads the local Room cache and broadcasts a `MISSING_PERSON_QUERY` packet to
+  the mesh. Replies fold in via `AppEvent.MissingPersonEvent.ResponseReceived`.
+  After a 4-second timeout with no replies, a "Not found yet" card is shown
+  with a Watch CTA so the user can be notified later.
+- **Watches** — grouped list of Dependents / Active SOS / Manual watches. The
+  viewmodel auto-adds:
+  - **DEPENDENT** — from incoming `AppEvent.ChildAlertEvent.AlertBroadcast`
+    (the old Child Alert flow now surfaces here).
+  - **SOS_AUTO** — own CRS ID when the user broadcasts SOS, so other devices
+    that search for them land on a known location.
+  - **MANUAL** — added explicitly via the "Add to watch list" CTA on a search
+    result.
+
+The unified design absorbs both 6A (Missing Person lookup) and 6B (Child
+Alert separation system) without duplicating UI — a child gone missing is
+just another watch entry the user is notified about.
