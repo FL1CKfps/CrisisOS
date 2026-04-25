@@ -99,22 +99,125 @@ fun DeadManScreen(
                 uiState = uiState,
                 onIntervalSelected = viewModel::setInterval,
                 onMessageChange = viewModel::updateAlertMessage,
-                onAddContact = { 
-                    // Open a picker from available family contacts if any, or mock for demo
-                    uiState.availableFamilyContacts.firstOrNull()?.let { viewModel.toggleContact(it) }
-                },
+                onAddContact = viewModel::openContactPicker,
                 onRemoveContact = viewModel::removeContact
             )
         }
 
+        // Inline error surface — replaces the previous silent no-op when the
+        // user tapped Activate without contacts or tried to change settings
+        // while the switch was already armed.
+        AnimatedVisibility(visible = uiState.errorMessage != null) {
+            uiState.errorMessage?.let { msg ->
+                Spacer(modifier = Modifier.height(12.dp))
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = CardDefaults.cardColors(
+                        containerColor = MaterialTheme.colorScheme.errorContainer
+                    )
+                ) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 12.dp, vertical = 10.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Text(
+                            text = msg,
+                            color = MaterialTheme.colorScheme.onErrorContainer,
+                            style = MaterialTheme.typography.bodySmall,
+                            modifier = Modifier.weight(1f)
+                        )
+                        IconButton(
+                            onClick = { viewModel.clearError() },
+                            modifier = Modifier.size(28.dp)
+                        ) {
+                            Icon(
+                                Icons.Default.Close,
+                                contentDescription = "Dismiss",
+                                modifier = Modifier.size(16.dp),
+                                tint = MaterialTheme.colorScheme.onErrorContainer
+                            )
+                        }
+                    }
+                }
+            }
+        }
+
         Spacer(modifier = Modifier.weight(1f))
 
-        ActivateToggle(uiState = uiState, onToggle = { 
-            if (uiState.isActive) viewModel.deactivate() else viewModel.activate() 
+        ActivateToggle(uiState = uiState, onToggle = {
+            if (uiState.isActive) viewModel.deactivate() else viewModel.activate()
         })
-        
+
         Spacer(modifier = Modifier.height(24.dp))
     }
+
+    if (uiState.showContactPicker) {
+        ContactPickerDialog(
+            available = uiState.availableFamilyContacts,
+            selected = uiState.escalationContacts,
+            onToggle = viewModel::toggleContact,
+            onDismiss = viewModel::dismissContactPicker
+        )
+    }
+}
+
+@Composable
+private fun ContactPickerDialog(
+    available: List<EscalationContact>,
+    selected: List<EscalationContact>,
+    onToggle: (EscalationContact) -> Unit,
+    onDismiss: () -> Unit
+) {
+    val selectedIds = remember(selected) { selected.map { it.crsId }.toSet() }
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Pick escalation contacts", fontWeight = FontWeight.Bold) },
+        text = {
+            Column(modifier = Modifier.fillMaxWidth()) {
+                Text(
+                    text = "Family / Emergency contacts will receive your last-known location and your pre-composed message if you don't check in by the deadline.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                Spacer(Modifier.height(12.dp))
+                available.forEach { contact ->
+                    val checked = contact.crsId in selectedIds
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(vertical = 4.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Checkbox(
+                            checked = checked,
+                            onCheckedChange = { onToggle(contact) }
+                        )
+                        Spacer(Modifier.width(8.dp))
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                text = contact.label.ifBlank { contact.crsId },
+                                style = MaterialTheme.typography.bodyMedium,
+                                fontWeight = FontWeight.Medium
+                            )
+                            if (contact.crsId.isNotBlank() && contact.label.isNotBlank()) {
+                                Text(
+                                    text = contact.crsId,
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = onDismiss) { Text("Done") }
+        }
+    )
 }
 
 @SuppressLint("DefaultLocale")

@@ -340,6 +340,73 @@ cross-reference, and the bootstrap NGO directory.
   v13→v14 path that already shipped to existing installs.  Comment in code
   flags this as a release blocker for the next non-hackathon build.
 
+## Dead Man Switch — Feature 5 fix pass
+
+Eleven bugs in the Dead Man Switch (Feature 5) were fixed end-to-end so the
+feature actually fires once, with the right payload, to the right peers, and
+the user is told about it locally:
+
+- **One-shot scheduling.** `DeadManWorker` is now a `OneTimeWorkRequest` with
+  `setInitialDelay(intervalMinutes, MINUTES)` instead of a `PeriodicWorkRequest`.
+  `DeadManViewModel.scheduleWorker()` enqueues with
+  `enqueueUniqueWork(WORK_NAME, ExistingWorkPolicy.REPLACE, ...)` so a check-in
+  cleanly cancels the in-flight deadline and arms a fresh one. The previous
+  periodic config (60-minute floor + repeat) was the wrong primitive entirely.
+- **Real escalation list survives the Worker boundary.** `DeadManWorker` now
+  serializes the contact list into the `Data` payload via `KEY_CONTACTS` and
+  decodes it inside `doWork()`. Previously the worker hardcoded the input to
+  `"[]"`, so escalation contacts were silently dropped.
+- **Correct on-wire packet type.** Worker now calls
+  `PacketFactory.buildDeadManPacket(...)` producing `DEAD_MAN_TRIGGER` packets
+  whose body is `DeadManPayload`. `MeshMessenger`'s receiver
+  (`MeshMessenger.kt:519`) decodes the same shape, so peers can finally act on
+  the alert. Previously the worker built `SOS_ALERT` packets, which the
+  receiver path tried to decode as `DeadManPayload` and silently failed.
+- **No more ANDROID_ID privacy leak.** Worker reads identity from
+  `IdentityRepository.getIdentity().first()` and uses the user's CRS ID and
+  alias. The previous code minted a sender ID from `Settings.Secure.ANDROID_ID`
+  (a stable cross-app fingerprint) and read alias from raw prefs.
+- **Fail-closed if identity isn't bootstrapped.** Worker returns
+  `Result.failure()` when identity is null/blank instead of falling back to a
+  collision-prone `"local_device"` ID. This prevents two unbootstrapped
+  devices from both broadcasting under the same fake ID.
+- **GPS attached to the alert.** Worker pulls the last-known location via
+  `LocationRepository.getLastKnownLocation()` and includes lat/lon/accuracy +
+  timestamp on the payload. The receiver formats this into the local
+  notification body so the recipient sees where the sender was last seen.
+- **Enriched `DeadManPayload`** — added `senderCrsId`, `senderAlias`,
+  `triggeredAt`, `latitude`, `longitude`, `accuracyMeters`,
+  `locationTimestamp`. All nullable except sender + timestamp; payload stays
+  backwards-compatible with peers running the old shape (extra fields just
+  decode as defaults).
+- **High-priority local notification when the dead-man fires.** Worker emits
+  `NotificationEvent.Sos.IncomingAlert(sosType="DEAD_MAN_TRIGGERED", ...)` on
+  the `NotificationEventBus`, which routes through the existing CRITICAL SOS
+  channel (DND-bypass, full-screen on Android 11+). The user (and anyone
+  holding their phone) now sees the moment the switch goes off — previously
+  the fire was silent on the originating device.
+- **Real contact picker.** `DeadManScreen` now opens an `AlertDialog` populated
+  from `ContactRepository.getFamilyContacts()` with a checkbox per contact,
+  showing both label and CRS ID. The `+` button used to silently call
+  `availableFamilyContacts.firstOrNull()?.let(::toggleContact)` (an explicit
+  `// or mock for demo` no-op).
+- **Activate refuses empty contact list.** Tapping Activate with no
+  escalation contacts now surfaces an inline error card
+  (`DeadManUiState.errorMessage`) with a dismiss button instead of silently
+  no-opping.
+- **Interval / contact changes locked while active.** `setInterval()` and
+  `openContactPicker()` refuse to mutate state while `isActive == true` and
+  surface the reason in the error card. The `SettingsSection` is also
+  wrapped in `AnimatedVisibility(visible = !isActive)` for visual reinforcement.
+- **Stable contact descriptors on the wire.** ViewModel passes
+  `"label <crsId>"` to the worker so even if the user edits a contact's
+  display name after arming, the broadcast still carries an addressable ID.
+
+Worker injection follows the existing `OutboxRetryWorker` pattern: `@HiltWorker`
+with `@AssistedInject`, repos resolved by `HiltWorkerFactory` (already wired
+in `CrisisOSApp`'s `Configuration.Provider`). No KSP2 traps introduced — no
+default args added on `@Provides` / Retrofit / `@Dao` surfaces.
+
 ## Online crisis-intel + Firebase wiring
 
 - **Firebase** — `app/google-services.json` ships the live config for project

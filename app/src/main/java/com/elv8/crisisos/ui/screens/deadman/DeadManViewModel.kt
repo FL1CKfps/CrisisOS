@@ -3,7 +3,7 @@ package com.elv8.crisisos.ui.screens.deadman
 import android.content.Context
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import androidx.work.ExistingPeriodicWorkPolicy
+import androidx.work.ExistingWorkPolicy
 import androidx.work.WorkInfo
 import androidx.work.WorkManager
 import com.elv8.crisisos.core.event.AppEvent
@@ -42,7 +42,11 @@ data class DeadManUiState(
     val escalationContacts: List<EscalationContact> = emptyList(),
     val alertMessage: String = "If you receive this, I haven't checked in. Send help.",
     val lastCheckIn: String = "--:--",
-    val timerExpired: Boolean = false
+    val timerExpired: Boolean = false,
+    /** Surfaced inline so taps on Activate / Add Contact never silently no-op. */
+    val errorMessage: String? = null,
+    /** True while the contact picker dialog is open. */
+    val showContactPicker: Boolean = false
 )
 
 @HiltViewModel
@@ -123,7 +127,12 @@ class DeadManViewModel @Inject constructor(
 
     fun activate() {
         val currentState = _uiState.value
-        if (currentState.escalationContacts.isEmpty()) return
+        if (currentState.escalationContacts.isEmpty()) {
+            _uiState.update {
+                it.copy(errorMessage = "Add at least one escalation contact before activating.")
+            }
+            return
+        }
         val nowString = getCurrentTimeString()
         val deadline = System.currentTimeMillis() + (currentState.intervalMinutes * 60L * 1000L)
 
@@ -136,31 +145,24 @@ class DeadManViewModel @Inject constructor(
             .putLong(K_DEADLINE, deadline)
             .apply()
 
-        val request = DeadManWorker.buildRequest(
-            currentState.intervalMinutes,
-            currentState.alertMessage,
-            currentState.escalationContacts.map { it.label }
-        )
-        workManager.enqueueUniquePeriodicWork(
-            DeadManWorker.WORK_TAG,
-            ExistingPeriodicWorkPolicy.REPLACE,
-            request
-        )
+        scheduleWorker(currentState.intervalMinutes, currentState.alertMessage, currentState.escalationContacts)
 
         _uiState.update {
             it.copy(
                 isActive = true,
                 lastCheckIn = nowString,
                 timerExpired = false,
-                timeRemainingSeconds = currentState.intervalMinutes * 60L
+                timeRemainingSeconds = currentState.intervalMinutes * 60L,
+                errorMessage = null
             )
         }
         startLocalCountdown()
     }
 
     fun deactivate() {
+        workManager.cancelUniqueWork(DeadManWorker.WORK_NAME)
         workManager.cancelAllWorkByTag(DeadManWorker.WORK_TAG)
-        _uiState.update { it.copy(isActive = false, timerExpired = false) }
+        _uiState.update { it.copy(isActive = false, timerExpired = false, errorMessage = null) }
         countdownJob?.cancel()
     }
 
@@ -184,27 +186,75 @@ class DeadManViewModel @Inject constructor(
                 )
             }
 
-            workManager.cancelAllWorkByTag(DeadManWorker.WORK_TAG)
-            val request = DeadManWorker.buildRequest(
-                currentState.intervalMinutes,
-                currentState.alertMessage,
-                currentState.escalationContacts.map { it.label }
-            )
-            workManager.enqueueUniquePeriodicWork(
-                DeadManWorker.WORK_TAG,
-                ExistingPeriodicWorkPolicy.REPLACE,
-                request
-            )
+            scheduleWorker(currentState.intervalMinutes, currentState.alertMessage, currentState.escalationContacts)
 
             startLocalCountdown()
             eventBus.tryEmit(AppEvent.DeadManEvent.CheckInReceived)
         }
     }
 
+    /**
+     * Single source of truth for scheduling the one-shot deadline worker.
+     * `enqueueUniqueWork(REPLACE, ...)` cancels any in-flight worker before
+     * enqueuing the new one, so a check-in cleanly resets the deadline
+     * without leaving a stale fire pending.
+     */
+    private fun scheduleWorker(
+        intervalMinutes: Int,
+        message: String,
+        contacts: List<EscalationContact>
+    ) {
+        // Pass a stable descriptor (CRS ID + label) so the worker payload
+        // carries something the recipient can act on even if the alias is
+        // renamed before the worker fires.
+        val descriptors = contacts.map {
+            if (it.crsId.isNotBlank()) "${it.label} <${it.crsId}>" else it.label
+        }
+        val request = DeadManWorker.buildRequest(intervalMinutes, message, descriptors)
+        workManager.enqueueUniqueWork(
+            DeadManWorker.WORK_NAME,
+            ExistingWorkPolicy.REPLACE,
+            request
+        )
+    }
+
     fun setInterval(minutes: Int) {
+        // Locked while active — the worker has already been scheduled with
+        // the previous deadline, and silently letting the user move the chip
+        // would desync the visible countdown from the real fire time.
+        if (_uiState.value.isActive) {
+            _uiState.update {
+                it.copy(errorMessage = "Deactivate the switch before changing the interval.")
+            }
+            return
+        }
         _uiState.update {
             it.copy(intervalMinutes = minutes, timeRemainingSeconds = minutes * 60L)
         }
+    }
+
+    fun openContactPicker() {
+        if (_uiState.value.isActive) {
+            _uiState.update {
+                it.copy(errorMessage = "Deactivate the switch before changing contacts.")
+            }
+            return
+        }
+        if (_uiState.value.availableFamilyContacts.isEmpty()) {
+            _uiState.update {
+                it.copy(errorMessage = "No family/emergency contacts found. Add them on the Contacts screen first.")
+            }
+            return
+        }
+        _uiState.update { it.copy(showContactPicker = true, errorMessage = null) }
+    }
+
+    fun dismissContactPicker() {
+        _uiState.update { it.copy(showContactPicker = false) }
+    }
+
+    fun clearError() {
+        _uiState.update { it.copy(errorMessage = null) }
     }
 
     fun updateAlertMessage(message: String) {
