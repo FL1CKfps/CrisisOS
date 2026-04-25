@@ -12,7 +12,9 @@ data class AiMessage(
     val content: String,
     val timestamp: Long = System.currentTimeMillis(),
     val isStreaming: Boolean = false,
-    val actions: List<AiAction> = emptyList()
+    val actions: List<AiAction> = emptyList(),
+    val firstTokenLatencyMs: Long? = null,
+    val tokensPerSecond: Float? = null
 )
 
 data class AiAction(
