@@ -45,8 +45,10 @@ data class DeadManUiState(
     val timerExpired: Boolean = false,
     /** Surfaced inline so taps on Activate / Add Contact never silently no-op. */
     val errorMessage: String? = null,
-    /** True while the contact picker dialog is open. */
-    val showContactPicker: Boolean = false
+    /** True while the add-contact dialog is open. */
+    val showAddContactDialog: Boolean = false,
+    /** Inline validation error inside the add-contact dialog (e.g. blank/duplicate CRS ID). */
+    val addContactError: String? = null
 )
 
 @HiltViewModel
@@ -233,28 +235,60 @@ class DeadManViewModel @Inject constructor(
         }
     }
 
-    fun openContactPicker() {
+    fun openAddContactDialog() {
         if (_uiState.value.isActive) {
             _uiState.update {
                 it.copy(errorMessage = "Deactivate the switch before changing contacts.")
             }
             return
         }
-        if (_uiState.value.availableFamilyContacts.isEmpty()) {
-            _uiState.update {
-                it.copy(errorMessage = "No family/emergency contacts found. Add them on the Contacts screen first.")
-            }
-            return
-        }
-        _uiState.update { it.copy(showContactPicker = true, errorMessage = null) }
+        // Always allowed even when no family contacts exist — users add by CRS ID directly.
+        _uiState.update { it.copy(showAddContactDialog = true, errorMessage = null, addContactError = null) }
     }
 
-    fun dismissContactPicker() {
-        _uiState.update { it.copy(showContactPicker = false) }
+    fun dismissAddContactDialog() {
+        _uiState.update { it.copy(showAddContactDialog = false, addContactError = null) }
+    }
+
+    /**
+     * Inline add-by-CRS-ID flow. Validates non-blank ID and rejects duplicates;
+     * the label is optional and falls back to the CRS ID for display.
+     * Persistence is intentionally NOT triggered here — escalation contacts are
+     * snapshotted into prefs + WorkManager input data only at activate(),
+     * matching the existing model where switch-off edits are draft-only.
+     */
+    fun addContactByCrsId(rawCrsId: String, rawLabel: String) {
+        val crsId = rawCrsId.trim()
+        val label = rawLabel.trim()
+        if (crsId.isBlank()) {
+            _uiState.update { it.copy(addContactError = "CRS ID is required.") }
+            return
+        }
+        val current = _uiState.value.escalationContacts
+        if (current.any { it.crsId.equals(crsId, ignoreCase = true) }) {
+            _uiState.update { it.copy(addContactError = "That contact is already on the list.") }
+            return
+        }
+        val newContact = EscalationContact(
+            crsId = crsId,
+            label = if (label.isNotBlank()) label else crsId
+        )
+        _uiState.update {
+            it.copy(
+                escalationContacts = it.escalationContacts + newContact,
+                showAddContactDialog = false,
+                addContactError = null,
+                errorMessage = null
+            )
+        }
     }
 
     fun clearError() {
         _uiState.update { it.copy(errorMessage = null) }
+    }
+
+    fun clearAddContactError() {
+        _uiState.update { it.copy(addContactError = null) }
     }
 
     fun updateAlertMessage(message: String) {
