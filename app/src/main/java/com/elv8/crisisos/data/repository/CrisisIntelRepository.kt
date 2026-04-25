@@ -4,6 +4,8 @@ import com.elv8.crisisos.data.remote.api.AcledApi
 import com.elv8.crisisos.data.remote.api.GdeltApi
 import com.elv8.crisisos.data.remote.api.dto.AcledEvent
 import com.elv8.crisisos.data.remote.api.dto.GdeltArticle
+import com.elv8.crisisos.data.remote.api.searchArticles
+import com.elv8.crisisos.data.remote.api.readEvents
 import javax.inject.Inject
 import javax.inject.Singleton
 

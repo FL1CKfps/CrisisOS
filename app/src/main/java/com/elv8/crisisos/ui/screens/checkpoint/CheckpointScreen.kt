@@ -61,8 +61,6 @@ fun CheckpointScreen(
             .fillMaxSize()
             .background(MaterialTheme.colorScheme.background)
     ) {
-        Spacer(modifier = Modifier.height(16.dp))
-
         SectionHeader(title = "CHECKPOINTS NEARBY", count = uiState.checkpoints.size)
 
         Spacer(modifier = Modifier.height(12.dp))

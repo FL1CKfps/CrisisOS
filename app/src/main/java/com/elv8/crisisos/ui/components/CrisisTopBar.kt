@@ -1,6 +1,8 @@
 package com.elv8.crisisos.ui.components
 
 import androidx.compose.foundation.layout.RowScope
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.statusBars
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
@@ -20,6 +22,7 @@ fun CrisisTopBar(
 ) {
     CenterAlignedTopAppBar(
         modifier = modifier,
+        windowInsets = WindowInsets.statusBars,
         colors = TopAppBarDefaults.centerAlignedTopAppBarColors(
             containerColor = Color.Transparent,
             scrolledContainerColor = Color.Transparent

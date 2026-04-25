@@ -40,34 +40,26 @@ fun DangerZoneScreen(
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     var sheetVisible by remember { mutableStateOf(false) }
+    val topBarState = com.elv8.crisisos.ui.components.LocalTopBarState.current
 
-    Scaffold(
-        topBar = {
-            TopAppBar(
-                title = { Text("Danger Zones") },
-                navigationIcon = {
-                    IconButton(onClick = onNavigateBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
-                    }
-                },
-                colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.background)
-            )
-        },
-        floatingActionButton = {
-            FloatingActionButton(
-                onClick = { sheetVisible = true },
-                containerColor = Color(0xFFFF9800),
-                contentColor = Color.White
-            ) {
-                Icon(Icons.Default.Add, contentDescription = "Report Zone")
+    LaunchedEffect(Unit) {
+        topBarState.update(
+            title = { Text("Danger Zones") },
+            navigationIcon = {
+                IconButton(onClick = onNavigateBack) {
+                    Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
+                }
             }
-        },
-        containerColor = MaterialTheme.colorScheme.background
-    ) { paddingValues ->
+        )
+    }
+
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(MaterialTheme.colorScheme.background)
+    ) {
         Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(paddingValues)
+            modifier = Modifier.fillMaxSize()
         ) {
             HeaderCard(uiState = uiState)
 
@@ -80,7 +72,7 @@ fun DangerZoneScreen(
 
             Spacer(modifier = Modifier.height(8.dp))
 
-                        LazyColumn(
+            LazyColumn(
                 modifier = Modifier
                     .fillMaxSize()
                     .padding(horizontal = 16.dp),
@@ -97,7 +89,7 @@ fun DangerZoneScreen(
                         EmptyState(
                             icon = Icons.Default.WarningAmber,
                             title = "No threats reported",
-                            subtitle = "No threats reported in your area � stay alert",
+                            subtitle = "No threats reported in your area  stay alert",
                             modifier = Modifier.fillMaxWidth().padding(top = 32.dp)
                         )
                     }
@@ -108,6 +100,17 @@ fun DangerZoneScreen(
                     item { Spacer(modifier = Modifier.height(80.dp)) }
                 }
             }
+        }
+
+        FloatingActionButton(
+            onClick = { sheetVisible = true },
+            containerColor = Color(0xFFFF9800),
+            contentColor = Color.White,
+            modifier = Modifier
+                .align(Alignment.BottomEnd)
+                .padding(16.dp)
+        ) {
+            Icon(Icons.Default.Add, contentDescription = "Report Zone")
         }
     }
 

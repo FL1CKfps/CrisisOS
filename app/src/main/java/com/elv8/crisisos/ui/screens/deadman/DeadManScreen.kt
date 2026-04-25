@@ -99,7 +99,10 @@ fun DeadManScreen(
                 uiState = uiState,
                 onIntervalSelected = viewModel::setInterval,
                 onMessageChange = viewModel::updateAlertMessage,
-                onAddContact = { viewModel.addContact("New Contact") },
+                onAddContact = { 
+                    // Open a picker from available family contacts if any, or mock for demo
+                    uiState.availableFamilyContacts.firstOrNull()?.let { viewModel.toggleContact(it) }
+                },
                 onRemoveContact = viewModel::removeContact
             )
         }
@@ -185,7 +188,7 @@ fun SettingsSection(
     onIntervalSelected: (Int) -> Unit,
     onMessageChange: (String) -> Unit,
     onAddContact: () -> Unit,
-    onRemoveContact: (String) -> Unit
+    onRemoveContact: (EscalationContact) -> Unit
 ) {
     Column(modifier = Modifier.fillMaxWidth()) {
         Text("Timer Interval", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
@@ -240,7 +243,7 @@ fun SettingsSection(
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Icon(Icons.Default.Person, contentDescription = null, modifier = Modifier.size(20.dp), tint = MaterialTheme.colorScheme.primary)
                     Spacer(modifier = Modifier.width(8.dp))
-                    Text(contact, style = MaterialTheme.typography.bodyMedium)
+                    Text(contact.label, style = MaterialTheme.typography.bodyMedium)
                 }
                 IconButton(onClick = { onRemoveContact(contact) }, modifier = Modifier.size(24.dp)) {
                     Icon(Icons.Default.Close, contentDescription = "Remove", modifier = Modifier.size(16.dp))
