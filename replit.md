@@ -296,36 +296,47 @@ which is the strongest check this environment supports. To produce an APK:
 
 ## KSP2 "unexpected jvm signature V" — root cause + fix
 
-Real root cause (diagnosed after a first attempted fix didn't take):
-**`CrisisIntelRepository` returned `Result<List<...>>` from suspend
-functions on a `@Singleton @Inject` class.** `kotlin.Result` is an inline
-value class, and KSP2's Analysis API on Kotlin 2.2.10 cannot synthesize a
-JVM descriptor for inline-class returns on Hilt-processed classes — it
-crashes with `unexpected jvm signature V` (the `V` being the void
-descriptor for the synthetic `*-impl` static helper Kotlin generates for
-inline-class methods). Forcing KSP1 isn't an option anymore —
-`ksp.useKsp2=false` is rejected by KSP 2.3.x.
+Real root cause (diagnosed after two earlier attempts):
+**The two new `@Dao` interfaces from the T003 / T004 work
+(`NewsItemDao`, `CommunityPostDao`) declared default arguments on
+abstract methods** — e.g. `fun getAllActive(now: Long = System.currentTimeMillis())`
+and `suspend fun deleteExpired(now: Long = System.currentTimeMillis())`.
+KSP2's Analysis API on Kotlin 2.2.10 + Room cannot generate a JVM
+descriptor for the synthetic `*$default` helper that Kotlin emits for
+default-valued parameters on abstract interface members, and crashes
+with the cryptic `unexpected jvm signature V` (where `V` is the void
+return descriptor of that helper). Every other DAO in the project
+(`OutboxDao`, `MediaDao`, `MessageRequestDao`, …) takes the same
+parameters explicitly, which is why nothing else broke.
+
+Forcing KSP1 isn't an option anymore — `ksp.useKsp2=false` is rejected
+by KSP 2.3.x.
 
 Fix applied:
 
-- `CrisisIntelRepository.crossReferenceClaim()` and `recentConflictEvents()`
-  now return plain `List<GdeltArticle>` / `List<AcledEvent>` (empty list on
-  failure) instead of `Result<List<…>>`. Callers
-  (`FakeNewsViewModel.analyzeClaim()`) already used `.getOrNull().orEmpty()`,
-  so behavior is identical.
+- `NewsItemDao` and `CommunityPostDao` no longer declare default arguments
+  on their abstract methods. `getAllActive()` and `deleteExpired()` now
+  require `now: Long` explicitly. Callers in `NewsRepositoryImpl` and
+  `CommunityBoardRepositoryImpl` were updated to pass
+  `System.currentTimeMillis()` at the call site.
+- The same pattern was scrubbed from the new Retrofit interfaces
+  (`GdeltApi.searchArticles`, `AcledApi.readEvents`). The interface
+  methods now take every parameter explicitly, and a Kotlin extension
+  function with the same name on the receiver type provides the previous
+  default-value ergonomics for callers — extensions live outside the
+  KSP-processed surface, so they're safe.
 
-Defensive cleanups applied at the same time (these aren't the root cause
-but they remove other patterns KSP2-AA is known to misbehave on, so the
-code stays robust against future Kotlin/KSP bumps):
+Defensive cleanups carried over from the prior round (not the root cause
+but kept for resilience against future Kotlin/KSP bumps):
 
-- `CrisisOSFirebase` now stores no delegated properties (`by lazy` removed),
-  and `logEvent` has two explicit overloads (`String` and `String + Map`)
-  instead of a default `Map` argument.
-- `NetworkModule` builds the `Json` instance inside its `@Provides` method
-  and pulls the OkHttp auth interceptor out into a local `Interceptor`
-  variable before installing it.
-- `BuildConfig.*_BASE_URL` are converted with `toHttpUrl()` instead of
-  `toHttpUrlOrNull() ?: ...`.
+- `CrisisIntelRepository` returns plain `List<…>` (empty on failure)
+  instead of `Result<List<…>>` (avoids the `kotlin.Result` inline-class
+  trap on Hilt-processed classes).
+- `CrisisOSFirebase` no longer uses `by lazy`, and `logEvent` has two
+  explicit overloads instead of a default `Map` argument.
+- `NetworkModule` builds the `Json` instance and the OkHttp auth
+  interceptor as locals inside `@Provides` instead of object-level
+  property initializers.
 
 > The `Build Android App` workflow only runs `gradlew tasks --all`, which
 > stops before `kspDebugKotlin`. Validating that the KSP fix sticks

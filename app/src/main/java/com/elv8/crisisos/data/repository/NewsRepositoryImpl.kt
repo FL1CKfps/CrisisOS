@@ -41,7 +41,8 @@ class NewsRepositoryImpl @Inject constructor(
 
     private val incomingStarted = AtomicBoolean(false)
 
-    override fun observe(): Flow<List<NewsItemEntity>> = dao.getAllActive()
+    override fun observe(): Flow<List<NewsItemEntity>> =
+        dao.getAllActive(System.currentTimeMillis())
 
     override suspend fun publish(
         headline: String,
@@ -91,7 +92,7 @@ class NewsRepositoryImpl @Inject constructor(
     }
 
     override suspend fun purgeExpired() {
-        dao.deleteExpired()
+        dao.deleteExpired(System.currentTimeMillis())
     }
 
     override fun observeIncoming() {

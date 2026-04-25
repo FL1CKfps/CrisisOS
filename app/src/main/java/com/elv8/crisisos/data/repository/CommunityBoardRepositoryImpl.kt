@@ -41,7 +41,8 @@ class CommunityBoardRepositoryImpl @Inject constructor(
 
     private val incomingStarted = AtomicBoolean(false)
 
-    override fun observe(): Flow<List<CommunityPostEntity>> = dao.getAllActive()
+    override fun observe(): Flow<List<CommunityPostEntity>> =
+        dao.getAllActive(System.currentTimeMillis())
 
     override suspend fun post(body: String, category: String, pinned: Boolean) {
         // Pin can only be set by NGO accounts — enforce regardless of caller.
@@ -85,7 +86,7 @@ class CommunityBoardRepositoryImpl @Inject constructor(
     }
 
     override suspend fun purgeExpired() {
-        dao.deleteExpired()
+        dao.deleteExpired(System.currentTimeMillis())
     }
 
     override fun observeIncoming() {
