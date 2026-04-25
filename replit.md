@@ -96,6 +96,73 @@ Map UX:
   is tappable to jump to that zone; bottom-left shows offline/online state.
 - Tapping a map pin opens the same `ZoneDetailSheet` as the list view.
 
+### Danger Zones + Routing Avoidance + Camp Capacity (Feature 2)
+
+- **Aggregation** — `DangerZoneRepositoryImpl.aggregateForMap()` groups
+  crowdsourced reports into 1 km² grid cells over a 2 h sliding window. A cell
+  with **3+ unique reporters** (counted by sender CRS ID) becomes a CRITICAL
+  red circle (600 m); 1–2 reports stay as orange "Unverified" (300 m). ACLED
+  events render at 800 m, darker red. Crowd reports auto-expire after 6 h;
+  ACLED rows live 7 d and refresh on the next pull. No schema change — the
+  source is encoded via `reportedBy = "ACLED"` plus read-side grouping.
+- **ACLED sync** — `syncFromAcled(country, lookbackDays)` is fired once per
+  process from `MapsViewModel` after the first GPS fix.
+  `guessCountryForLocation()` is a coarse first-pass mapper.
+- **Routing avoidance** — `MapsViewModel.pickNearestAvoiding()` runs a
+  planar segment-vs-circle test against confirmed-red zones and picks the
+  closest open safe zone whose direct line does NOT cross any red circle. If
+  every option is blocked it falls back to the closest. The "NEAREST OPEN"
+  badge shows a `REROUTED · NEAREST OPEN` label + "Avoiding red zone on
+  direct route" subline when this happens.
+- **Report Danger FAB** — bottom-right red `SmallFloatingActionButton` calls
+  `reportDangerHere()`, which writes a row stamped with the user's
+  Settings.Secure.ANDROID_ID as `reportedBy` and broadcasts a
+  `DANGER_REPORT` mesh packet. A toast confirms.
+- **Mesh ingest** — `observeIncomingReports()` is idempotent (a `@Volatile
+  observerStarted` flag) and consumes peer `DANGER_REPORT` packets, stamping
+  them with the originating sender's CRS ID so peer reports also count toward
+  the 3-confirmation threshold.
+- **95% capacity broadcast** — `SafeZoneRepositoryImpl.updateOccupancy()`
+  emits `AppEvent.CapacityEvent.CampNearCapacity` when an NGO update crosses
+  `NEAR_CAPACITY_THRESHOLD = 0.95f`. `MapsViewModel` collects this and shows
+  a top-center red banner ("Camp X near capacity · redirect incoming
+  arrivals") that auto-dismisses after 30 s.
+- **Overlay rendering** — `MapOverlayManager.setDangerZones(...)` draws each
+  zone as a translucent filled `Polygon.pointsAsCircle`, prefixed `DANGER_`
+  in the overlay map. Each circle is inserted at index 0 of `mapView.overlays`
+  via `addOrUpdateOverlay(..., atBottom = true)` so danger circles always
+  layer **below** safe-zone pins, the user-location marker, and the route
+  polyline — even when an ACLED sync resolves after pins are already on the
+  map. Legend gained a separate "DANGER" group with red and orange entries.
+
+### Architect review — Feature 2 fixes applied
+
+- **Capacity event fires only on the rising edge.** `SafeZoneRepositoryImpl
+  .updateOccupancy()` reads the prior occupancy ratio, runs the DB update,
+  then emits `CampNearCapacity` only when `before < 0.95 && after >= 0.95`.
+  Restricted to `SafeZoneType.CAMP` so non-camp zones (hospitals, etc.) don't
+  trigger the camp-overflow banner. Prevents repeated emissions on every
+  subsequent NGO update at >= 95%.
+- **Capacity collector no longer blocks.** `MapsViewModel`'s `eventBus.events
+  .collect { ... }` no longer holds a 30 s `delay()` inline. Each banner
+  spawns its own child coroutine for the auto-dismiss timer, keyed by the
+  hint's timestamp so a fresh banner from another camp is never wiped by an
+  old timer.
+- **Z-ordered overlay registration.** `MapOverlayManager.addOrUpdateOverlay()`
+  gained an `atBottom: Boolean` flag; `setDangerZones()` uses it so danger
+  circles always render under pins regardless of which `LaunchedEffect` fires
+  first.
+- **Atomic idempotency guard.** `DangerZoneRepositoryImpl.observeIncoming
+  Reports()` now uses `AtomicBoolean.compareAndSet(false, true)` instead of a
+  `@Volatile` flag so two concurrent ViewModel inits cannot double-subscribe.
+- **Pseudonymous reporter id.** Crowdsourced danger reports are stamped with
+  the local CRS ID from `IdentityRepository.getIdentity()` (the same
+  pseudonymous identifier used everywhere else on the mesh) instead of
+  `Settings.Secure.ANDROID_ID`. ANDROID_ID is a persistent cross-app device
+  identifier and would have leaked the device across peers and the local
+  Room mirror; CRS IDs do not. Falls back to a `"local_device"` literal only
+  before identity setup completes.
+
 ## On-Device AI Assistant (Gemma 4 E2B via LiteRT-LM)
 
 Lives in `core/ai/GemmaInference.kt`, `ui/screens/aiassistant/AiViewModel.kt`,

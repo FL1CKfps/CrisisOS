@@ -15,6 +15,9 @@ interface SafeZoneDao {
     @Query("SELECT COUNT(*) FROM safe_zones")
     suspend fun count(): Int
 
+    @Query("SELECT * FROM safe_zones WHERE id = :id LIMIT 1")
+    suspend fun getById(id: String): SafeZoneEntity?
+
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insert(zone: SafeZoneEntity)
 

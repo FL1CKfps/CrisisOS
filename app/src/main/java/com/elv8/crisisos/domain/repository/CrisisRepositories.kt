@@ -42,7 +42,26 @@ interface CheckpointRepository {
 
 interface DangerZoneRepository {
     fun getDangerZones(): kotlinx.coroutines.flow.Flow<List<com.elv8.crisisos.domain.model.DangerZone>>
+
+    /**
+     * Map-ready danger zones. Crowdsourced reports are aggregated by 1 km²
+     * grid + 2 h sliding window per CrisisOS_Context.md Feature 2:
+     *   - 3+ unique CRS IDs in same cell → CRITICAL (red)
+     *   - 1-2 reports → MEDIUM (orange, "unverified")
+     * ACLED entries are emitted one-per-event (always CRITICAL, not aggregated).
+     */
+    fun aggregateForMap(): kotlinx.coroutines.flow.Flow<List<com.elv8.crisisos.domain.model.AggregatedDangerZone>>
+
     suspend fun reportZone(zone: com.elv8.crisisos.domain.model.DangerZone)
+
+    /**
+     * Pull recent ACLED conflict events for [country] over the last [lookbackDays]
+     * days and persist them as danger-zone entries (reportedBy = "ACLED").
+     * Safe to call repeatedly — duplicates are de-duplicated by event id.
+     * Returns the number of entries inserted/updated, 0 on failure.
+     */
+    suspend fun syncFromAcled(country: String, lookbackDays: Int): Int
+
     fun observeIncomingReports()
     suspend fun purgeStaleReports()
 }

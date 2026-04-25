@@ -58,6 +58,22 @@ sealed class AppEvent {
         data class ResponseReceived(val requestId: String, val fromCrsId: String, val fromAlias: String, val fromAvatarColor: Int, val accepted: Boolean) : ConnectionEvent()
     }
 
+    sealed class CapacityEvent : AppEvent() {
+        /**
+         * Emitted when an NGO updates a camp's occupancy and it crosses the
+         * 95% threshold defined in CrisisOS_Context.md (Feature 2 § "Camp
+         * capacity"). Nearby camps and the maps screen react to this by
+         * surfacing a "redirect incoming" hint.
+         */
+        data class CampNearCapacity(
+            val zoneId: String,
+            val zoneName: String,
+            val occupancyRatio: Float,
+            val latitude: Double,
+            val longitude: Double
+        ) : CapacityEvent()
+    }
+
     sealed class SystemEvent : AppEvent() {
         object AppForegrounded : SystemEvent()
         object AppBackgrounded : SystemEvent()

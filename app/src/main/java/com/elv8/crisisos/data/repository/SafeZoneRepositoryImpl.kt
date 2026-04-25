@@ -1,5 +1,7 @@
 package com.elv8.crisisos.data.repository
 
+import com.elv8.crisisos.core.event.AppEvent
+import com.elv8.crisisos.core.event.EventBus
 import com.elv8.crisisos.data.local.dao.SafeZoneDao
 import com.elv8.crisisos.data.local.entity.SafeZoneEntity
 import com.elv8.crisisos.domain.model.SafeZone
@@ -13,7 +15,8 @@ import javax.inject.Singleton
 
 @Singleton
 class SafeZoneRepositoryImpl @Inject constructor(
-    private val dao: SafeZoneDao
+    private val dao: SafeZoneDao,
+    private val eventBus: EventBus
 ) : SafeZoneRepository {
 
     override fun observe(): Flow<List<SafeZone>> =
@@ -106,10 +109,47 @@ class SafeZoneRepositoryImpl @Inject constructor(
     }
 
     override suspend fun updateOccupancy(id: String, occupancy: Int?, operational: Boolean) {
+        // Spec (Feature 2 § "Camp capacity"): when a CAMP **crosses** 95%
+        // occupancy, broadcast a hint so nearby camps can absorb the
+        // overflow ("Camp A near capacity, redirect incoming"). We compare
+        // before/after ratios so the event only fires on the rising edge —
+        // not on every subsequent NGO update at >=95%.
+        val before = dao.getById(id)
+        val beforeRatio = before?.let { ratioOf(it.capacity, it.currentOccupancy, it.isOperational) }
+
         dao.updateCapacity(id, occupancy, operational, System.currentTimeMillis())
+
+        val updated = dao.getById(id) ?: return
+        if (updated.type != SafeZoneType.CAMP.name) return
+        val newRatio = ratioOf(updated.capacity, updated.currentOccupancy, updated.isOperational) ?: return
+
+        val crossedRising = (beforeRatio == null || beforeRatio < NEAR_CAPACITY_THRESHOLD) &&
+            newRatio >= NEAR_CAPACITY_THRESHOLD
+        if (crossedRising) {
+            eventBus.tryEmit(
+                AppEvent.CapacityEvent.CampNearCapacity(
+                    zoneId = updated.id,
+                    zoneName = updated.name,
+                    occupancyRatio = newRatio,
+                    latitude = updated.latitude,
+                    longitude = updated.longitude
+                )
+            )
+        }
+    }
+
+    private fun ratioOf(cap: Int?, occ: Int?, operational: Boolean): Float? {
+        if (!operational) return null
+        if (cap == null || occ == null || cap <= 0) return null
+        return occ.toFloat() / cap.toFloat()
     }
 
     override suspend fun delete(id: String) {
         dao.delete(id)
+    }
+
+    companion object {
+        // 95% — the threshold from CrisisOS_Context.md Feature 2.
+        const val NEAR_CAPACITY_THRESHOLD = 0.95f
     }
 }

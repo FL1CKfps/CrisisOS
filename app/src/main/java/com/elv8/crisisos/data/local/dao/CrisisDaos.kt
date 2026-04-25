@@ -74,8 +74,23 @@ interface DangerZoneDao {
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertDangerZone(zone: DangerZoneEntity): Long
 
-    @Query("DELETE FROM danger_zones WHERE timestamp < :olderThanMillis")       
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertAll(zones: List<DangerZoneEntity>): List<Long>
+
+    @Query("DELETE FROM danger_zones WHERE timestamp < :olderThanMillis")
     suspend fun deleteOlderThan(olderThanMillis: Long): Int
+
+    /**
+     * Spec: crowdsourced reports auto-expire after 6 h. ACLED-sourced rows
+     * (reportedBy = 'ACLED') are NOT touched here — they are refreshed on
+     * the next ACLED sync and pruned separately by [deleteAcledOlderThan].
+     */
+    @Query("DELETE FROM danger_zones WHERE timestamp < :olderThanMillis AND reportedBy != 'ACLED'")
+    suspend fun deleteCrowdsourcedOlderThan(olderThanMillis: Long): Int
+
+    /** ACLED rows live longer (default 7 days) — they are authoritative until refreshed. */
+    @Query("DELETE FROM danger_zones WHERE reportedBy = 'ACLED' AND timestamp < :olderThanMillis")
+    suspend fun deleteAcledOlderThan(olderThanMillis: Long): Int
 }
 
 @Dao

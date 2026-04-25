@@ -42,6 +42,8 @@ import org.osmdroid.util.GeoPoint
 private val ColorOpen      = Color(0xFF1D9E75)   // green
 private val ColorNearFull  = Color(0xFFEF9F27)   // orange
 private val ColorFullClosed = Color(0xFFE24B4A)  // red
+private val ColorDangerRed  = Color(0xFFC23A39)  // confirmed danger zone
+private val ColorDangerOrange = Color(0xFFC07A1C) // unverified danger report
 
 private val ColorCamp       = Color(0xFF2196F3)
 private val ColorHospital   = Color(0xFFE91E63)
@@ -158,6 +160,12 @@ private fun MapPane(uiState: MapsUiState, viewModel: MapsViewModel) {
             mgr.updateUserLocation(GeoPoint(location.latitude, location.longitude))
         }
 
+        // Render danger zones FIRST so safe-zone pins draw on top of them.
+        LaunchedEffect(overlayManager, uiState.dangerZones) {
+            val mgr = overlayManager ?: return@LaunchedEffect
+            mgr.setDangerZones(zones = uiState.dangerZones)
+        }
+
         // Sync safe-zone markers (full replace whenever the list changes)
         LaunchedEffect(overlayManager, uiState.safeZones) {
             val mgr = overlayManager ?: return@LaunchedEffect
@@ -203,14 +211,26 @@ private fun MapPane(uiState: MapsUiState, viewModel: MapsViewModel) {
                 .padding(start = 12.dp, top = 12.dp)
         )
 
-        // Top-right: nearest-zone hint badge
+        // Top-right: nearest-zone hint badge (with reroute marker if applicable)
         if (uiState.nearestOpenZone != null) {
             NearestZoneBadge(
                 zone = uiState.nearestOpenZone!!,
+                rerouted = uiState.routeWasRerouted,
                 modifier = Modifier
                     .align(Alignment.TopEnd)
                     .padding(end = 12.dp, top = 12.dp),
                 onClick = { viewModel.centerOnZone(uiState.nearestOpenZone!!) }
+            )
+        }
+
+        // Top-center: 95% camp-capacity broadcast banner
+        uiState.capacityHint?.let { hint ->
+            CapacityBroadcastBanner(
+                hint = hint,
+                modifier = Modifier
+                    .align(Alignment.TopCenter)
+                    .padding(top = 12.dp),
+                onDismiss = { viewModel.dismissCapacityHint() }
             )
         }
 
@@ -222,19 +242,58 @@ private fun MapPane(uiState: MapsUiState, viewModel: MapsViewModel) {
                 .padding(start = 12.dp, bottom = 16.dp)
         )
 
-        // Bottom-right: locate-me FAB
-        FloatingActionButton(
-            onClick = { viewModel.centerOnUserLocation() },
+        // Bottom-right column: danger-report FAB on top of locate-me FAB
+        Column(
             modifier = Modifier
                 .align(Alignment.BottomEnd)
                 .padding(end = 16.dp, bottom = 16.dp),
-            containerColor = MaterialTheme.colorScheme.primary,
-            contentColor = MaterialTheme.colorScheme.onPrimary
+            verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
-            Icon(
-                imageVector = if (uiState.userLocation != null) Icons.Default.MyLocation else Icons.Default.LocationSearching,
-                contentDescription = "Locate me"
-            )
+            SmallFloatingActionButton(
+                onClick = { viewModel.reportDangerHere() },
+                containerColor = Color(0xFFC23A39),
+                contentColor = Color.White
+            ) {
+                Icon(
+                    imageVector = Icons.Default.Warning,
+                    contentDescription = "Report danger here"
+                )
+            }
+            FloatingActionButton(
+                onClick = { viewModel.centerOnUserLocation() },
+                containerColor = MaterialTheme.colorScheme.primary,
+                contentColor = MaterialTheme.colorScheme.onPrimary
+            ) {
+                Icon(
+                    imageVector = if (uiState.userLocation != null) Icons.Default.MyLocation else Icons.Default.LocationSearching,
+                    contentDescription = "Locate me"
+                )
+            }
+        }
+
+        // Transient toasts (e.g. "Reported. 2 more nearby reports will auto-flag…")
+        uiState.transientMessage?.let { msg ->
+            LaunchedEffect(msg) {
+                kotlinx.coroutines.delay(4_000L)
+                viewModel.clearTransientMessage()
+            }
+            Surface(
+                modifier = Modifier
+                    .align(Alignment.BottomCenter)
+                    .padding(bottom = 100.dp, start = 24.dp, end = 24.dp),
+                shape = RoundedCornerShape(8.dp),
+                color = MaterialTheme.colorScheme.inverseSurface,
+                tonalElevation = 4.dp,
+                shadowElevation = 4.dp
+            ) {
+                Text(
+                    msg,
+                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 10.dp),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.inverseOnSurface,
+                    fontWeight = FontWeight.Medium
+                )
+            }
         }
     }
 }
@@ -308,6 +367,16 @@ private fun MapLegend(modifier: Modifier = Modifier) {
             LegendDot(color = ColorOpen,        label = "Open")
             LegendDot(color = ColorNearFull,    label = "Near full")
             LegendDot(color = ColorFullClosed,  label = "Full / closed")
+            Spacer(Modifier.height(6.dp))
+            Text(
+                "DANGER",
+                style = MaterialTheme.typography.labelSmall,
+                fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+            Spacer(Modifier.height(4.dp))
+            LegendDot(color = ColorDangerRed,    label = "Confirmed (3+ reports)")
+            LegendDot(color = ColorDangerOrange, label = "Unverified report")
         }
     }
 }
@@ -330,7 +399,12 @@ private fun LegendDot(color: Color, label: String) {
 }
 
 @Composable
-private fun NearestZoneBadge(zone: SafeZone, modifier: Modifier, onClick: () -> Unit) {
+private fun NearestZoneBadge(
+    zone: SafeZone,
+    rerouted: Boolean,
+    modifier: Modifier,
+    onClick: () -> Unit
+) {
     // Use a darker green for ~4.5:1 white-on-color contrast (WCAG AA compliant)
     val deepGreen = Color(0xFF0F6B4F)
     Surface(
@@ -348,7 +422,7 @@ private fun NearestZoneBadge(zone: SafeZone, modifier: Modifier, onClick: () -> 
             Spacer(Modifier.width(8.dp))
             Column {
                 Text(
-                    "NEAREST OPEN",
+                    if (rerouted) "REROUTED · NEAREST OPEN" else "NEAREST OPEN",
                     style = MaterialTheme.typography.labelSmall,
                     fontWeight = FontWeight.Bold,
                     color = Color.White
@@ -359,6 +433,52 @@ private fun NearestZoneBadge(zone: SafeZone, modifier: Modifier, onClick: () -> 
                     fontWeight = FontWeight.Bold,
                     color = Color.White
                 )
+                if (rerouted) {
+                    Text(
+                        "Avoiding red zone on direct route",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = Color.White.copy(alpha = 0.85f)
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun CapacityBroadcastBanner(
+    hint: CapacityHint,
+    modifier: Modifier,
+    onDismiss: () -> Unit
+) {
+    Surface(
+        modifier = modifier,
+        shape = RoundedCornerShape(10.dp),
+        color = Color(0xFFB02A29),
+        tonalElevation = 4.dp,
+        shadowElevation = 4.dp
+    ) {
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp)
+        ) {
+            Icon(Icons.Default.Warning, contentDescription = null, tint = Color.White, modifier = Modifier.size(18.dp))
+            Spacer(Modifier.width(10.dp))
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    "${hint.zoneName.uppercase()} NEAR CAPACITY",
+                    style = MaterialTheme.typography.labelSmall,
+                    fontWeight = FontWeight.Bold,
+                    color = Color.White
+                )
+                Text(
+                    "${(hint.ratio * 100).toInt()}% full · redirect incoming arrivals",
+                    style = MaterialTheme.typography.labelMedium,
+                    color = Color.White
+                )
+            }
+            IconButton(onClick = onDismiss) {
+                Icon(Icons.Default.Close, contentDescription = "Dismiss", tint = Color.White)
             }
         }
     }
