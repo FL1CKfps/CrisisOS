@@ -407,6 +407,56 @@ with `@AssistedInject`, repos resolved by `HiltWorkerFactory` (already wired
 in `CrisisOSApp`'s `Configuration.Provider`). No KSP2 traps introduced — no
 default args added on `@Provides` / Retrofit / `@Dao` surfaces.
 
+## Dead Man Switch — UI/UX revamp + inline add-by-CRS-ID
+
+The Dead Man screen was rewritten end-to-end. Two user-facing changes ship
+together:
+
+- **Inline "Add Contact by CRS ID" dialog.** The previous picker dialog read
+  from `ContactRepository.getFamilyContacts()` and silently no-op'd when no
+  family contacts existed (CrisisOS has no Contacts management page). The
+  new `AddContactDialog` accepts a CRS ID (required) + label (optional)
+  directly from the keyboard. It validates non-blank input, rejects
+  duplicates case-insensitively, and surfaces inline errors in the dialog
+  body. If the device happens to have family contacts cached, they appear
+  as one-tap quick-pick chips below the form. State is held in
+  `rememberSaveable` so input survives rotation.
+- **ViewModel rename + new method.** `showContactPicker` →
+  `showAddContactDialog`; `openContactPicker` → `openAddContactDialog`;
+  `dismissContactPicker` → `dismissAddContactDialog`. New
+  `addContactByCrsId(rawCrsId, rawLabel)` plus `addContactError` field
+  and `clearAddContactError()`. The empty-family-contacts blocking guard
+  was removed from `openAddContactDialog` so the dialog is always reachable.
+  Persistence model is unchanged: the contact list is still snapshotted
+  into prefs + WorkManager input data only at activate(), matching the
+  draft-edit-then-arm flow.
+
+UI revamp highlights:
+
+- **Hero timer (260dp ring)** with progress that color-shifts through
+  primary → orange → error as the deadline drains; only when armed.
+- **Animated status pill** ("● ARMED" with pulsing dot vs "○ DISARMED")
+  directly under the timer.
+- **Settings as bordered cards** (Interval / Auto-SOS Message / Escalation
+  Contacts) in the disarmed state; armed state collapses settings and shows
+  an `ArmedSummaryCard` summarising interval, contact count, and message.
+- **Modern contact rows** with circular avatar showing the first letter of
+  the label (or CRS ID), name + secondary CRS ID, subtle remove button.
+- **Empty contacts state** with icon, headline, and inline "Add a contact"
+  CTA so users always know what to do next.
+- **Sticky bottom CTA** — the activate/deactivate button lives outside the
+  scrollable middle area (`Column(weight=1f, verticalScroll)` above), so it
+  stays reachable no matter how many contacts the user adds.
+- **Gradient activate button** (primary when disarmed, error red when
+  armed) with PlayArrow / Stop iconography.
+
+No regressions to Feature 5 internals (one-shot WorkManager scheduling,
+DEAD_MAN_TRIGGER packet routing, identity fail-closed, GPS-attached
+payload, high-priority local notification) — the revamp is screen-only
+plus the renamed/added VM surface listed above. Architect review PASSED
+on the revamp diff after fixing one missing `ColumnScope` import flagged
+in the first review pass.
+
 ## Online crisis-intel + Firebase wiring
 
 - **Firebase** — `app/google-services.json` ships the live config for project
