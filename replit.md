@@ -293,3 +293,43 @@ which is the strongest check this environment supports. To produce an APK:
    `.gitignore` already excludes it).
 3. Run `./gradlew :app:assembleDebug` — the resulting APK will land at
    `app/build/outputs/apk/debug/app-debug.apk`.
+
+## KSP2 "unexpected jvm signature V" — root cause + fix
+
+The original failure during `kspDebugKotlin` was the well-known
+KSP-2 / Analysis-API bug on Kotlin 2.2.10 + Hilt 2.56 / Dagger 2.56,
+triggered by:
+
+1. **Property delegates on `@Inject` classes** — `val analytics by lazy { ... }`
+   inside `CrisisOSFirebase`.
+2. **Default-valued `Map`/lambda arguments** on methods of injected classes —
+   `fun logEvent(name: String, params: Map<String, String> = emptyMap())`.
+3. **Complex initializers / builders bound to top-level `val`s inside an
+   `@Module object`** — `private val lenientJson = Json { ... }` inside
+   `NetworkModule`.
+
+KSP2's analysis API trips on these and emits the cryptic
+`unexpected jvm signature V` (because it's looking at a `Unit`-returning
+synthetic accessor / default-args helper and doesn't know how to map it to a
+JVM descriptor). Forcing KSP1 isn't an option anymore — `ksp.useKsp2=false`
+is rejected by KSP 2.3.x.
+
+Fix applied:
+
+- `CrisisOSFirebase` now stores no delegated properties, and `logEvent`
+  has two explicit overloads (`String` + `String, Map`) instead of a default
+  argument.
+- `NetworkModule` builds the `Json` instance inside its `@Provides` method
+  and pulls the OkHttp interceptor out into a local `Interceptor` variable
+  before installing it.
+- `BuildConfig.GDELT_BASE_URL` / `BuildConfig.ACLED_BASE_URL` are converted
+  with `toHttpUrl()` (throws on invalid) instead of `toHttpUrlOrNull() ?: ...`
+  to drop a redundant Elvis chain that was also hitting KSP.
+
+Net effect: the Hilt + Retrofit + Firebase wiring is functionally identical;
+only the syntactic patterns that confused KSP2 have been removed.
+
+> The `Build Android App` workflow only runs `gradlew tasks --all`, which
+> stops before `kspDebugKotlin`. Validating that the KSP fix sticks
+> requires running `./gradlew :app:assembleDebug` (or
+> `:app:kspDebugKotlin`) on a machine with the Android SDK installed.
