@@ -45,9 +45,25 @@ class IdentityRepositoryImpl @Inject constructor(
     }
 
     override suspend fun updateAlias(newAlias: String) {
+        // Defense-in-depth for the NGO authority gate (CrisisNews / Community Board):
+        // CrisisNews "official" and Community "pinned" privileges are derived from
+        // an "NGO_*" / "*_OFFICIAL" alias heuristic. Without cryptographic packet
+        // signing (a known followup tracked in replit.md), the only way to keep
+        // that gate meaningful is to refuse self-service NGO alias adoption from
+        // the in-app rename flow. Real NGO provisioning will arrive via a signed
+        // onboarding bundle that bypasses this guard.
+        val sanitized = newAlias.trim()
+        require(sanitized.isNotEmpty()) { "Alias cannot be blank" }
+        val looksLikeNgo = sanitized.startsWith("NGO_") || sanitized.endsWith("_OFFICIAL")
+        if (looksLikeNgo) {
+            throw SecurityException(
+                "NGO aliases (NGO_* / *_OFFICIAL) are reserved for verified " +
+                "organisations and cannot be self-assigned."
+            )
+        }
         val current = userIdentityDao.getIdentityOnce()
         if (current != null) {
-            userIdentityDao.updateAlias(current.crsId, newAlias)
+            userIdentityDao.updateAlias(current.crsId, sanitized)
         }
     }
 

@@ -297,18 +297,44 @@ cross-reference, and the bootstrap NGO directory.
 
 ## Architect review — addressed fixes (T005)
 
-- **NGO authority enforced at the data boundary**: `NewsRepositoryImpl.publish()`
-  now derives `isOfficial` from the local identity's alias (`NGO_*` /
-  `*_OFFICIAL` heuristic) and throws `SecurityException` for non-NGO callers —
-  the caller-supplied `isOfficial` argument is intentionally ignored.
-  `CommunityBoardRepositoryImpl.setPinned()` and the `pinned=true` path of
-  `post()` enforce the same NGO check.  Both ViewModels surface the failure
-  via their existing error state.
+- **NGO authority enforced at the data boundary (publish path)**:
+  `NewsRepositoryImpl.publish()` derives `isOfficial` from the local identity's
+  alias (`NGO_*` / `*_OFFICIAL` heuristic) and throws `SecurityException` for
+  non-NGO callers — the caller-supplied `isOfficial` argument is intentionally
+  ignored.  `CommunityBoardRepositoryImpl.setPinned()` and the `pinned=true`
+  path of `post()` enforce the same NGO check.  Both ViewModels surface the
+  failure via their existing error state.
+- **NGO authority enforced at the data boundary (ingest path)** — closes a
+  forge-on-the-wire bypass surfaced by the architect:
+  - `NewsRepositoryImpl.observeIncoming()` no longer trusts
+    `payload.isOfficial` directly. The official bit is now coerced via
+    `payload.isOfficial && isNgoAlias(payload.sourceAlias) &&
+    isNgoAlias(event.packet.senderAlias)` — both the payload-claimed source
+    and the wrapping packet's sender alias must independently pass the NGO
+    heuristic, otherwise the post lands as a regular non-official entry.
+  - `CommunityBoardRepositoryImpl.observeIncoming()` coerces inbound
+    `pinned` to false unless `event.packet.senderAlias` passes the NGO
+    heuristic. To make this check meaningful, `post()` now exposes the NGO
+    alias as `senderAlias` for **pinned posts only** — the personal CRS ID
+    is still never on the wire (an NGO alias like `NGO_OXFAM` is an org
+    tag, not a personal identifier, so the spec's anonymity guarantee is
+    preserved).
+  - `IdentityRepositoryImpl.updateAlias()` now refuses any self-assigned
+    alias matching the NGO pattern (`NGO_*` / `*_OFFICIAL`) so a regular
+    user cannot trivially elevate themselves by renaming. Real NGO
+    provisioning will arrive via a signed onboarding bundle that bypasses
+    this guard.
+- **Known limit (tracked followup, NOT for this build)**: alias-based NGO
+  authority is best-effort defense-in-depth. A determined attacker who can
+  craft raw mesh packets and chooses an NGO-pattern alias can still forge
+  authority — only cryptographic packet signing (Ed25519 per-NGO key + a
+  baked-in NGO trust root) closes that completely. That work is a multi-day
+  feature outside the current session's scope.
 - **`observeIncoming()` idempotent registration**: `NewsRepositoryImpl`,
-  `CommunityBoardRepositoryImpl`, and `DeconflictionRepositoryImpl` now guard
-  the long-lived event-bus collector with an `AtomicBoolean` so that repeat
-  ViewModel inits (configuration changes, screen re-entry) cannot register
-  duplicate collectors.
+  `CommunityBoardRepositoryImpl`, and `DeconflictionRepositoryImpl` guard the
+  long-lived event-bus collector with an `AtomicBoolean` so repeat ViewModel
+  inits (configuration changes, screen re-entry) cannot register duplicate
+  collectors.
 - **Destructive Room fallback retained with a note**: `DatabaseModule` keeps
   `fallbackToDestructiveMigration()` as a safety net for the unwritten
   v13→v14 path that already shipped to existing installs.  Comment in code

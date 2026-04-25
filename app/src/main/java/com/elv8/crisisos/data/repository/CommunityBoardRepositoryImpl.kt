@@ -47,7 +47,8 @@ class CommunityBoardRepositoryImpl @Inject constructor(
     override suspend fun post(body: String, category: String, pinned: Boolean) {
         // Pin can only be set by NGO accounts — enforce regardless of caller.
         val identity = identityRepository.getIdentity().first()
-        val pinResolved = pinned && isNgoAlias(identity?.alias)
+        val isNgo = isNgoAlias(identity?.alias)
+        val pinResolved = pinned && isNgo
         val now = System.currentTimeMillis()
         val entity = CommunityPostEntity(
             id = UUID.randomUUID().toString(),
@@ -59,7 +60,12 @@ class CommunityBoardRepositoryImpl @Inject constructor(
         )
         dao.insert(entity)
 
-        // ANONYMOUS by spec — never put a CRS ID on the wire for community posts.
+        // ANONYMOUS by spec — the personal CRS ID never goes on the wire.
+        // For pinned posts only, we expose the NGO alias as the sender so
+        // peers can verify the pin authority on ingest. The NGO alias is an
+        // org tag (e.g. "NGO_OXFAM"), not a personal identifier, so this
+        // preserves the anonymity guarantee for individuals while making
+        // pinning authority verifiable across hops.
         val payload = CommunityPostPayload(
             id = entity.id,
             body = entity.body,
@@ -70,7 +76,7 @@ class CommunityBoardRepositoryImpl @Inject constructor(
         )
         val packet = PacketFactory.buildCommunityPostPacket(
             senderId = "anonymous",
-            senderAlias = "Anonymous",
+            senderAlias = if (pinResolved) identity?.alias.orEmpty() else "Anonymous",
             payload = payload
         )
         messenger.send(packet)
@@ -100,12 +106,19 @@ class CommunityBoardRepositoryImpl @Inject constructor(
                         ?: return@collect
                     if (dao.exists(payload.id) > 0) return@collect
                     if (payload.expiresAt < System.currentTimeMillis()) return@collect
+                    // Authority gate on ingest: a peer can forge `payload.pinned=true`,
+                    // so we coerce it to false unless the wrapping packet's senderAlias
+                    // passes the NGO heuristic. Legitimate NGO-pinned posts surface the
+                    // org alias on the wire (see post() above) precisely so this check
+                    // is meaningful. Until cryptographic NGO signatures land, this is
+                    // the strongest verification we can do at the data boundary.
+                    val pinnedResolved = payload.pinned && isNgoAlias(event.packet.senderAlias)
                     dao.insert(
                         CommunityPostEntity(
                             id = payload.id,
                             body = payload.body,
                             category = payload.category,
-                            pinned = payload.pinned,
+                            pinned = pinnedResolved,
                             createdAt = payload.createdAt,
                             expiresAt = payload.expiresAt
                         )

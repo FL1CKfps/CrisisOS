@@ -106,6 +106,17 @@ class NewsRepositoryImpl @Inject constructor(
                         ?: return@collect
                     if (dao.exists(payload.id) > 0) return@collect
                     if (payload.expiresAt < System.currentTimeMillis()) return@collect
+                    // Authority gate on ingest: a peer can forge `payload.isOfficial=true`
+                    // and `payload.sourceAlias="NGO_*"`, so we cross-check against the
+                    // wrapping packet's senderAlias (set by PacketFactory at the source
+                    // device). Until cryptographic NGO signatures land, we coerce
+                    // `isOfficial` to false unless BOTH the payload-claimed source and
+                    // the actual sender alias pass the NGO heuristic. This matches the
+                    // architect-flagged trust boundary — never honor caller-supplied
+                    // privilege bits without sender verification.
+                    val officialResolved = payload.isOfficial &&
+                        isNgoAlias(payload.sourceAlias) &&
+                        isNgoAlias(event.packet.senderAlias)
                     dao.insert(
                         NewsItemEntity(
                             id = payload.id,
@@ -114,7 +125,7 @@ class NewsRepositoryImpl @Inject constructor(
                             category = payload.category,
                             sourceAlias = payload.sourceAlias,
                             sourceCrsId = payload.sourceCrsId,
-                            isOfficial = payload.isOfficial,
+                            isOfficial = officialResolved,
                             publishedAt = payload.publishedAt,
                             expiresAt = payload.expiresAt
                         )
