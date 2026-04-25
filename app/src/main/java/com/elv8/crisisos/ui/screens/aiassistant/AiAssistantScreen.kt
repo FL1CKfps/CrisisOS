@@ -58,7 +58,6 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import coil.compose.AsyncImage
-import com.mikepenz.markdown.m3.Markdown
 import com.elv8.crisisos.domain.model.AiMessage
 import com.elv8.crisisos.domain.model.AiRole
 import com.elv8.crisisos.ui.components.LocalTopBarState
@@ -517,10 +516,11 @@ fun AiMessageItem(
                                     BlinkingCursor()
                                 }
                             } else {
-                                // Use a key to prevent re-rendering issues with the Markdown library
-                                key(message.id) {
-                                    Markdown(content = message.content)
-                                }
+                                Text(
+                                    text = message.content,
+                                    style = MaterialTheme.typography.bodyLarge,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
                             }
                         }
                     }

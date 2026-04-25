@@ -117,9 +117,6 @@ dependencies {
     // LiteRT-LM (on-device Gemma runtime)
     implementation("com.google.ai.edge.litertlm:litertlm-android:0.10.2")
 
-    // Markdown rendering
-    implementation("com.mikepenz:multiplatform-markdown-renderer-m3:0.40.2")
-    implementation("com.mikepenz:multiplatform-markdown-renderer:0.40.2")
 
     // Testing
     testImplementation(libs.junit)
