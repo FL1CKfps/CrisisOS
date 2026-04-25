@@ -1,10 +1,21 @@
+import java.util.Properties
+
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.compose)
     alias(libs.plugins.hilt.android)
     alias(libs.plugins.ksp)
+    alias(libs.plugins.google.services)
     kotlin("plugin.serialization") version "2.2.10"
 }
+
+// Read API credentials from local.properties (preferred) or env vars (CI / Replit).
+val localProps = Properties().apply {
+    val f = rootProject.file("local.properties")
+    if (f.exists()) f.inputStream().use { load(it) }
+}
+fun cred(key: String, fallback: String = ""): String =
+    localProps.getProperty(key) ?: System.getenv(key) ?: fallback
 
 android {
     namespace = "com.elv8.crisisos"
@@ -18,6 +29,19 @@ android {
         versionName = "1.0"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+
+        buildConfigField("String", "ACLED_EMAIL", "\"${cred("ACLED_EMAIL")}\"")
+        buildConfigField("String", "ACLED_KEY", "\"${cred("ACLED_KEY")}\"")
+        buildConfigField(
+            "String",
+            "GDELT_BASE_URL",
+            "\"${cred("GDELT_BASE_URL", "https://api.gdeltproject.org/api/v2/")}\""
+        )
+        buildConfigField(
+            "String",
+            "ACLED_BASE_URL",
+            "\"${cred("ACLED_BASE_URL", "https://api.acleddata.com/")}\""
+        )
     }
 
     buildTypes {
@@ -36,6 +60,15 @@ android {
     buildFeatures {
         compose = true
         buildConfig = true
+    }
+    packaging {
+        resources {
+            excludes += setOf(
+                "META-INF/AL2.0",
+                "META-INF/LGPL2.1",
+                "META-INF/DEPENDENCIES"
+            )
+        }
     }
 }
 
@@ -117,6 +150,18 @@ dependencies {
     // LiteRT-LM (on-device Gemma runtime)
     implementation("com.google.ai.edge.litertlm:litertlm-android:0.10.2")
 
+    // Firebase (Analytics + Crashlytics-ready BOM, Auth-anonymous, Firestore for NGO directory)
+    implementation(platform("com.google.firebase:firebase-bom:33.6.0"))
+    implementation("com.google.firebase:firebase-analytics-ktx")
+    implementation("com.google.firebase:firebase-auth-ktx")
+    implementation("com.google.firebase:firebase-firestore-ktx")
+
+    // Networking — GDELT 2.0 + ACLED REST clients
+    implementation("com.squareup.retrofit2:retrofit:2.11.0")
+    implementation("com.squareup.retrofit2:converter-scalars:2.11.0")
+    implementation("com.jakewharton.retrofit:retrofit2-kotlinx-serialization-converter:1.0.0")
+    implementation("com.squareup.okhttp3:okhttp:4.12.0")
+    implementation("com.squareup.okhttp3:logging-interceptor:4.12.0")
 
     // Testing
     testImplementation(libs.junit)

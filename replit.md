@@ -246,3 +246,50 @@ cross-reference, and the bootstrap NGO directory.
   `fallbackToDestructiveMigration()` as a safety net for the unwritten
   v13→v14 path that already shipped to existing installs.  Comment in code
   flags this as a release blocker for the next non-hackathon build.
+
+## Online crisis-intel + Firebase wiring
+
+- **Firebase** — `app/google-services.json` ships the live config for project
+  `zenith-devs` / package `com.elv8.crisisos`. The `google-services` Gradle
+  plugin is applied at the app level, the BoM-based dependencies pull
+  `firebase-analytics-ktx`, `firebase-auth-ktx`, and
+  `firebase-firestore-ktx`, and `core/firebase/CrisisOSFirebase.kt` is a thin
+  Hilt-injected facade that the `CrisisOSApp` class calls on boot to log the
+  `app_open` event.
+- **GDELT 2.0 DOC API** — public, no auth.
+  `data/remote/api/GdeltApi.kt` exposes `searchArticles(query, ...)` and the
+  matching DTOs live in `data/remote/api/dto/GdeltDoc.kt`. Wired via Retrofit
+  in `di/NetworkModule.kt` against
+  `https://api.gdeltproject.org/api/v2/`.
+- **ACLED Read API** — auth required.
+  `data/remote/api/AcledApi.kt` exposes `readEvents(country, eventDate, ...)`.
+  An OkHttp interceptor in `NetworkModule` automatically attaches `email` +
+  `key` from `BuildConfig.ACLED_EMAIL` / `BuildConfig.ACLED_KEY`. Those
+  values are wired through `app/build.gradle.kts`'s `buildConfigField`,
+  which reads from `local.properties` first and falls back to environment
+  variables (`ACLED_EMAIL`, `ACLED_KEY`) so credentials are never committed
+  to source.
+- **CrisisIntelRepository** — `data/repository/CrisisIntelRepository.kt`
+  combines both clients behind safe `Result<T>` returns, so callers stay
+  offline-tolerant: any network failure degrades silently to "use the
+  offline analyzer's verdict only".
+- **Fake News Detector cross-reference** — `FakeNewsViewModel.analyzeClaim()`
+  now queries GDELT for the top 3 matching domains and merges them into the
+  `sources` list of the offline verdict. The offline heuristic remains the
+  authoritative verdict per spec; GDELT only adds context.
+
+### Building the APK
+
+The Replit Nix environment does **not** ship the full Android SDK
+(`platforms-android-37` + `build-tools` + `cmdline-tools`), so
+`./gradlew assembleDebug` cannot run here. The current workflow
+(`./gradlew tasks --all`) validates the Gradle config + dependency graph,
+which is the strongest check this environment supports. To produce an APK:
+
+1. Open the project in Android Studio (or any machine with the SDK
+   installed under `ANDROID_HOME`).
+2. The `local.properties` file is generated automatically with the ACLED
+   credentials and base URLs — keep it out of source control (the repo's
+   `.gitignore` already excludes it).
+3. Run `./gradlew :app:assembleDebug` — the resulting APK will land at
+   `app/build/outputs/apk/debug/app-debug.apk`.

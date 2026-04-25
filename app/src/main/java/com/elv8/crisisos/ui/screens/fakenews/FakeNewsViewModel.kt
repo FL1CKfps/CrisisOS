@@ -4,6 +4,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.elv8.crisisos.core.heuristics.FakeNewsAnalyzer
 import com.elv8.crisisos.data.local.entity.FakeNewsCheckEntity
+import com.elv8.crisisos.data.repository.CrisisIntelRepository
 import com.elv8.crisisos.domain.model.Verdict
 import com.elv8.crisisos.domain.model.VerificationResult
 import com.elv8.crisisos.domain.repository.FakeNewsCheckRepository
@@ -31,7 +32,8 @@ data class FakeNewsUiState(
 @HiltViewModel
 class FakeNewsViewModel @Inject constructor(
     private val analyzer: FakeNewsAnalyzer,
-    private val repository: FakeNewsCheckRepository
+    private val repository: FakeNewsCheckRepository,
+    private val intel: CrisisIntelRepository
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(FakeNewsUiState())
@@ -59,9 +61,17 @@ class FakeNewsViewModel @Inject constructor(
 
         viewModelScope.launch {
             // Pure-CPU analyzer; bounce off Default to keep the main thread free.
-            val result = withContext(Dispatchers.Default) {
+            val baseResult = withContext(Dispatchers.Default) {
                 analyzer.analyze(claim, currentTimeLabel())
             }
+
+            // Best-effort GDELT cross-reference (online only). Failures are
+            // swallowed: the offline verdict is still authoritative per spec.
+            val articles = intel.crossReferenceClaim(claim).getOrNull().orEmpty()
+            val mergedSources = if (articles.isNotEmpty()) {
+                baseResult.sources + articles.take(3).map { "GDELT: ${it.domain}" }
+            } else baseResult.sources
+            val result = baseResult.copy(sources = mergedSources)
 
             // Persist into Room — recentChecks list will refresh through the observe() flow.
             repository.record(result.toEntity())

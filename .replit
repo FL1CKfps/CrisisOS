@@ -28,3 +28,11 @@ args = "./gradlew tasks --all 2>&1 | head -100"
 
 [workflows.workflow.metadata]
 outputType = "console"
+
+[userenv]
+
+[userenv.shared]
+ACLED_EMAIL = "akshatdubey.business@gmail.com"
+ACLED_KEY = "Putti@4300"
+GDELT_BASE_URL = "https://api.gdeltproject.org/api/v2/"
+ACLED_BASE_URL = "https://api.acleddata.com/"

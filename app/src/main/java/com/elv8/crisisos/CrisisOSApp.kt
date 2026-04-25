@@ -5,6 +5,7 @@ import androidx.hilt.work.HiltWorkerFactory
 import androidx.work.Configuration
 import androidx.work.ExistingPeriodicWorkPolicy
 import androidx.work.WorkManager
+import com.elv8.crisisos.core.firebase.CrisisOSFirebase
 import com.elv8.crisisos.core.notification.NotificationManagerWrapper
 import com.elv8.crisisos.work.OutboxRetryWorker
 import com.elv8.crisisos.work.MediaCleanupWorker
@@ -17,8 +18,11 @@ class CrisisOSApp : Application(), Configuration.Provider {
     @Inject
     lateinit var workerFactory: HiltWorkerFactory
 
-    @Inject 
+    @Inject
     lateinit var notificationManagerWrapper: NotificationManagerWrapper
+
+    @Inject
+    lateinit var firebase: CrisisOSFirebase
 
     override val workManagerConfiguration: Configuration
         get() = Configuration.Builder()
@@ -27,7 +31,11 @@ class CrisisOSApp : Application(), Configuration.Provider {
 
     override fun onCreate() {
         super.onCreate()
-        
+
+        // Firebase auto-inits via FirebaseInitProvider; this is a defensive call.
+        firebase.ensureInitialized(this)
+        firebase.logEvent("app_open")
+
         WorkManager.getInstance(this).enqueueUniquePeriodicWork(
             OutboxRetryWorker.WORK_TAG,
             ExistingPeriodicWorkPolicy.KEEP,
