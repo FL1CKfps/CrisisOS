@@ -67,7 +67,7 @@ class FakeNewsViewModel @Inject constructor(
 
             // Best-effort GDELT cross-reference (online only). Failures are
             // swallowed: the offline verdict is still authoritative per spec.
-            val articles = intel.crossReferenceClaim(claim).getOrNull().orEmpty()
+            val articles = intel.crossReferenceClaim(claim)
             val mergedSources = if (articles.isNotEmpty()) {
                 baseResult.sources + articles.take(3).map { "GDELT: ${it.domain}" }
             } else baseResult.sources
