@@ -15,13 +15,19 @@ class IdentityRepositoryImpl @Inject constructor(
     private val userIdentityDao: UserIdentityDao
 ) : IdentityRepository {
 
-    override suspend fun getOrCreateIdentity(deviceId: String, alias: String): UserIdentity {
+    override suspend fun getOrCreateIdentity(
+        deviceId: String,
+        firstName: String,
+        surname: String,
+        dob: String
+    ): UserIdentity {
         val existing = userIdentityDao.getIdentityOnce()
         if (existing != null) {
             return existing.toDomain()
         }
 
-        val newCrsId = CrsIdGenerator.generate()
+        val newCrsId = CrsIdGenerator.generate(firstName, surname, dob)
+        val alias = "$firstName $surname"
         val newEntity = UserIdentityEntity(
             crsId = newCrsId,
             alias = alias,

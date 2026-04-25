@@ -12,6 +12,7 @@ data class ChatMessage(
     val id: String,
     val senderId: String,
     val senderAlias: String,
+    val targetId: String? = null,
     val content: String,
     val timestamp: Long,
     val deliveryStatus: MessageStatus,

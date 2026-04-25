@@ -1,11 +1,8 @@
 package com.elv8.crisisos
 
-import android.content.Context
 import com.elv8.crisisos.data.local.db.CrisisDatabase
 import com.elv8.crisisos.data.local.entity.*
 import com.elv8.crisisos.domain.model.identity.CrsIdGenerator
-import com.elv8.crisisos.domain.model.MessageStatus
-import com.elv8.crisisos.domain.model.MessageType
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.util.UUID
@@ -17,7 +14,13 @@ object MockDataSeeder {
             val existingId = database.userIdentityDao().getIdentityOnce()
             if (existingId != null) return@withContext
 
-            val localId = CrsIdGenerator.generate()
+            val names = localAlias.split(" ")
+            val firstName = names.getOrNull(0) ?: "Mock"
+            val surname = names.getOrNull(1) ?: "User"
+            val dob = "01012000"
+            
+            val localId = CrsIdGenerator.generate(firstName, surname, dob)
+
             database.userIdentityDao().insert(
                 UserIdentityEntity(
                     crsId = localId,

@@ -7,6 +7,8 @@ import androidx.compose.animation.core.*
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.shape.CircleShape
@@ -26,6 +28,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextAlign
@@ -45,7 +48,9 @@ fun OnboardingScreen(
 ) {
     val pagerState = rememberPagerState(pageCount = { 4 })
     val coroutineScope = rememberCoroutineScope()
-    var alias by remember { mutableStateOf("") }
+    var firstName by remember { mutableStateOf("") }
+    var surname by remember { mutableStateOf("") }
+    var dob by remember { mutableStateOf("") }
     
     val permissionsToRequest = mutableListOf(
         Manifest.permission.ACCESS_FINE_LOCATION,
@@ -114,10 +119,14 @@ fun OnboardingScreen(
                         }
                     )
                     3 -> PageFourIdentity(
-                        alias = alias,
-                        onAliasChange = { if (it.length <= 24) alias = it },
+                        firstName = firstName,
+                        onFirstNameChange = { firstName = it },
+                        surname = surname,
+                        onSurnameChange = { surname = it },
+                        dob = dob,
+                        onDobChange = { if (it.length <= 8 && it.all { char -> char.isDigit() }) dob = it },
                         onStart = {
-                            viewModel.completeOnboarding(alias)
+                            viewModel.completeOnboarding(firstName, surname, dob)
                             onFinish()
                         }
                     )
@@ -381,8 +390,12 @@ fun PermissionRow(icon: ImageVector, title: String, description: String) {
 
 @Composable
 fun PageFourIdentity(
-    alias: String,
-    onAliasChange: (String) -> Unit,
+    firstName: String,
+    onFirstNameChange: (String) -> Unit,
+    surname: String,
+    onSurnameChange: (String) -> Unit,
+    dob: String,
+    onDobChange: (String) -> Unit,
     onStart: () -> Unit
 ) {
     val focusRequester = remember { FocusRequester() }
@@ -395,46 +408,92 @@ fun PageFourIdentity(
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .padding(32.dp),
+            .padding(32.dp)
+            .verticalScroll(rememberScrollState()),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center
     ) {
         Text(
-            text = "WHAT SHOULD PEERS CALL YOU?",
+            text = "CREATE YOUR SURVIVAL IDENTITY",
             style = MaterialTheme.typography.titleMedium,
             fontWeight = FontWeight.Bold,
             color = MaterialTheme.colorScheme.primary,
+            modifier = Modifier.padding(bottom = 8.dp)
+        )
+        
+        Text(
+            text = "This generates your unique CRS-ID. No internet required.",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
             modifier = Modifier.padding(bottom = 32.dp)
         )
 
         OutlinedTextField(
-            value = alias,
-            onValueChange = onAliasChange,
+            value = firstName,
+            onValueChange = onFirstNameChange,
             modifier = Modifier
                 .fillMaxWidth()
                 .focusRequester(focusRequester),
-            textStyle = LocalTextStyle.current.copy(
-                fontSize = 24.sp,
-                textAlign = TextAlign.Center,
-                fontWeight = FontWeight.Bold
-            ),
-            placeholder = { 
-                Text("Enter Alias", modifier = Modifier.fillMaxWidth(), textAlign = TextAlign.Center, fontSize = 24.sp) 
-            },
+            label = { Text("First Name") },
+            singleLine = true,
+            shape = RoundedCornerShape(16.dp),
+            keyboardOptions = KeyboardOptions(imeAction = ImeAction.Next)
+        )
+        
+        Spacer(modifier = Modifier.height(16.dp))
+        
+        OutlinedTextField(
+            value = surname,
+            onValueChange = onSurnameChange,
+            modifier = Modifier.fillMaxWidth(),
+            label = { Text("Surname") },
+            singleLine = true,
+            shape = RoundedCornerShape(16.dp),
+            keyboardOptions = KeyboardOptions(imeAction = ImeAction.Next)
+        )
+        
+        Spacer(modifier = Modifier.height(16.dp))
+        
+        OutlinedTextField(
+            value = dob,
+            onValueChange = onDobChange,
+            modifier = Modifier.fillMaxWidth(),
+            label = { Text("Date of Birth (DDMMYYYY)") },
+            placeholder = { Text("e.g. 15032007") },
             singleLine = true,
             shape = RoundedCornerShape(16.dp),
             keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
-            keyboardActions = KeyboardActions(onDone = { onStart() })
+            keyboardActions = KeyboardActions(onDone = { 
+                if (firstName.isNotBlank() && surname.isNotBlank() && dob.length == 8) onStart() 
+            })
         )
-        
-        Text(
-            text = "/24",
-            style = MaterialTheme.typography.labelSmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier
-                .align(Alignment.End)
-                .padding(top = 8.dp)
-        )
+
+        if (firstName.length >= 2 && surname.length >= 2 && dob.length == 8) {
+            Spacer(modifier = Modifier.height(24.dp))
+            Card(
+                colors = CardDefaults.cardColors(
+                    containerColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.3f)
+                ),
+                shape = RoundedCornerShape(12.dp)
+            ) {
+                Column(
+                    modifier = Modifier.padding(16.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
+                    Text(
+                        text = "YOUR CRS-ID",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.primary
+                    )
+                    Text(
+                        text = "${firstName.take(2).uppercase()}${surname.take(2).uppercase()}-$dob",
+                        style = MaterialTheme.typography.headlineSmall,
+                        fontWeight = FontWeight.Bold,
+                        fontFamily = FontFamily.Monospace
+                    )
+                }
+            }
+        }
 
         Spacer(modifier = Modifier.height(48.dp))
 
@@ -443,7 +502,7 @@ fun PageFourIdentity(
             modifier = Modifier
                 .fillMaxWidth()
                 .height(56.dp),
-            enabled = alias.isNotBlank()
+            enabled = firstName.isNotBlank() && surname.isNotBlank() && dob.length == 8
         ) {
             Text("START CRISISOS", fontWeight = FontWeight.Bold, fontSize = 16.sp)
         }

@@ -131,17 +131,28 @@ class SupplyViewModel @Inject constructor(
         }
     }
 
+    fun applyPrefill(category: String?, notes: String?) {
+        if (category == null && notes == null) return
+        
+        val type = category?.let { 
+            runCatching { SupplyType.valueOf(it.uppercase()) }.getOrNull() 
+        }
+        
+        _uiState.update {
+            it.copy(
+                selectedType = type,
+                notes = notes ?: it.notes,
+                currentStep = if (type != null) 1 else 0
+            )
+        }
+    }
+
     fun cancelRequest(requestId: String) {
         viewModelScope.launch {
             val requests = uiState.value.activeRequests
             val request = requests.find { it.id == requestId }
             if (request != null) {
-                // To cancel properly, we would update status to CANCELLED/EXPIRED if there was a method
-                // For now the prompt says "Update Room status to CANCELLED". Wait, RequestStatus.EXPIRED exists.
-                // RequestStatus has: QUEUED, BROADCASTING, NGO_RECEIVED, CONFIRMED, DELIVERED, EXPIRED
-                val updatedRequest = request.copy(status = RequestStatus.EXPIRED) // Or cancel if present
-                // We don't have updateStatus method in repository, so we just use submitRequest? No, that broadcasts.
-                // RequestStatus.EXPIRED seems closest to cancelling since CANCELLED doesn't exist?
+                supplyRepository.submitRequest(request.copy(status = RequestStatus.CANCELLED))
             }
         }
     }

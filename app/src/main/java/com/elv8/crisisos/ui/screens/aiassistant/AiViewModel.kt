@@ -1,11 +1,16 @@
 package com.elv8.crisisos.ui.screens.aiassistant
 
+import android.net.Uri
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.elv8.crisisos.core.ai.AiContextGatherer
+import com.elv8.crisisos.core.ai.GemmaInference
+import com.elv8.crisisos.core.ai.ResponseCompletion
+import com.elv8.crisisos.domain.model.AiAction
 import com.elv8.crisisos.domain.model.AiMessage
 import com.elv8.crisisos.domain.model.AiRole
 import dagger.hilt.android.lifecycle.HiltViewModel
-import kotlinx.coroutines.delay
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -16,97 +21,268 @@ import javax.inject.Inject
 data class AiUiState(
     val messages: List<AiMessage> = emptyList(),
     val inputText: String = "",
+    val attachedImageUri: Uri? = null,
     val isProcessing: Boolean = false,
-    val isOffline: Boolean = true
+    val isThinking: Boolean = false,
+    val isOffline: Boolean = true,
+    val isModelLoaded: Boolean = false,
+    val isModelLoading: Boolean = false,
+    val downloadProgress: Float? = null,
+    val errorMessage: String? = null
 )
 
 @HiltViewModel
-class AiViewModel @Inject constructor() : ViewModel() {
+class AiViewModel @Inject constructor(
+    private val gemma: GemmaInference,
+    private val contextGatherer: AiContextGatherer
+) : ViewModel() {
+    private var activeAssistantMessageId: String? = null
+    private var activeAssistantAccumulatedText: String = ""
+    private var responseJob: Job? = null
+
     private val _uiState = MutableStateFlow(
         AiUiState(
             messages = listOf(
                 AiMessage(
                     role = AiRole.SYSTEM,
-                    content = "Running on-device. No data leaves your phone."
+                    content = "CrisisOS AI is powered by Gemma 4 E2B. All inference happens locally on your device."
                 )
             )
         )
     )
     val uiState: StateFlow<AiUiState> = _uiState.asStateFlow()
 
-    private val fakeResponses = listOf(
-        "Apply direct pressure to the wound with a clean cloth. If bleeding is severe and from a limb, consider a tourniquet above the wound.",
-        "Boil water for at least 1 minute. If boiling is not possible, use chemical purification tablets or a 0.1 micron water filter.",
-        "Move to higher ground immediately. Avoid walking or driving through flood waters. Follow the designated evacuation routes broadcasted on the mesh network.",
-        "Use the SOS broadcast feature in this app to alert nearby mesh nodes. If you have cellular signal, dial 911 or your local emergency number.",
-        "To signal for rescue, make yourself visible. Use a mirror or reflective object to flash sunlight, create three signal fires in a triangle, or use the app's flashing screen SOS mode."
-    )
+    init {
+        viewModelScope.launch {
+            _uiState.update { it.copy(isModelLoading = true, errorMessage = null) }
+            gemma.loadModel()
+            val loaded = gemma.isModelLoaded()
+            _uiState.update { 
+                it.copy(
+                    isModelLoaded = loaded, 
+                    isModelLoading = false,
+                    errorMessage = if (!loaded && gemma.isModelDownloaded()) "Failed to initialize engine. The model shard may be incompatible or corrupted." else null
+                )
+            }
+        }
+
+        viewModelScope.launch {
+            gemma.downloadProgress.collect { progress ->
+                _uiState.update { it.copy(downloadProgress = progress) }
+            }
+        }
+
+        // Handle partial result streaming from Gemma
+        viewModelScope.launch {
+            gemma.partialResults.collect { partial ->
+                if (partial.isEmpty()) return@collect
+
+                _uiState.update { it.copy(isThinking = false) }
+
+                if (activeAssistantMessageId == null) {
+                    val newMsg = AiMessage(
+                        role = AiRole.ASSISTANT,
+                        content = partial,
+                        isStreaming = true
+                    )
+                    activeAssistantMessageId = newMsg.id
+                    activeAssistantAccumulatedText = partial
+                    _uiState.update { state -> state.copy(messages = state.messages + newMsg) }
+                } else {
+                    activeAssistantAccumulatedText += partial
+                    val targetId = activeAssistantMessageId
+                    _uiState.update { state ->
+                        val updated = state.messages.map {
+                            if (it.id == targetId) it.copy(content = activeAssistantAccumulatedText) else it
+                        }
+                        state.copy(messages = updated)
+                    }
+                }
+            }
+        }
+
+        viewModelScope.launch {
+            gemma.responseCompleted.collect { completion ->
+                val targetId = activeAssistantMessageId
+                _uiState.update { state ->
+                    var updatedMessages = state.messages
+                    if (targetId != null) {
+                        updatedMessages = updatedMessages.map {
+                            if (it.id == targetId) {
+                                val finalContent = activeAssistantAccumulatedText.trim()
+                                it.copy(
+                                    content = finalContent,
+                                    isStreaming = false,
+                                    actions = parseActions(finalContent)
+                                )
+                            } else it
+                        }
+                    } else if (completion == ResponseCompletion.FAILED) {
+                        updatedMessages = updatedMessages + AiMessage(
+                            role = AiRole.ASSISTANT,
+                            content = "I could not generate a local response. Please try again."
+                        )
+                    }
+
+                    state.copy(
+                        messages = updatedMessages,
+                        isProcessing = false,
+                        isThinking = false,
+                        isModelLoaded = gemma.isModelLoaded()
+                    )
+                }
+
+                activeAssistantMessageId = null
+                activeAssistantAccumulatedText = ""
+            }
+        }
+    }
+
+    private fun parseActions(text: String): List<AiAction> {
+        val actions = mutableListOf<AiAction>()
+        val regex = Regex("\\[ACTION:([A-Z_]+)(?:\\?([^]]+))?]")
+        regex.findAll(text).forEach { match ->
+            val feature = match.groupValues[1]
+            val paramsString = match.groupValues.getOrNull(2)
+            val params = mutableMapOf<String, String>()
+            
+            paramsString?.split("&")?.forEach { pair ->
+                val parts = pair.split("=")
+                if (parts.size == 2) {
+                    params[parts[0]] = parts[1]
+                }
+            }
+            
+            actions.add(AiAction(feature, params))
+        }
+        return actions
+    }
 
     fun updateInput(text: String) {
         _uiState.update { it.copy(inputText = text) }
     }
 
-    fun sendMessage(forcedText: String? = null) {
-        val messageContent = forcedText ?: _uiState.value.inputText
-        if (messageContent.isBlank() || _uiState.value.isProcessing) return
+    fun attachImage(uri: Uri?) {
+        _uiState.update { it.copy(attachedImageUri = uri) }
+    }
 
-        val userMessage = AiMessage(role = AiRole.USER, content = messageContent.trim())
-        
+    fun clearAttachedImage() {
+        _uiState.update { it.copy(attachedImageUri = null) }
+    }
+
+    fun sendMessage(forcedText: String? = null) {
+        val currentState = _uiState.value
+        val messageContent = (forcedText ?: currentState.inputText).trim()
+        val attachedImage = currentState.attachedImageUri
+
+        if (currentState.isProcessing) return
+        if (messageContent.isBlank() && attachedImage == null) return
+
+        if (!currentState.isModelLoaded) {
+            _uiState.update { state ->
+                state.copy(
+                    messages = state.messages + AiMessage(
+                        role = AiRole.SYSTEM,
+                        content = "Model is not ready. Tap download to install Gemma 4 E2B first."
+                    )
+                )
+            }
+            return
+        }
+
+        val userMessageContent = buildString {
+            if (messageContent.isNotBlank()) {
+                append(messageContent)
+            }
+            if (attachedImage != null) {
+                if (isNotEmpty() && !endsWith("\n")) append("\n\n")
+                append("[Image attached]")
+            }
+        }.ifBlank { "[Image attached]" }
+
+        val userMessage = AiMessage(role = AiRole.USER, content = userMessageContent)
+
         _uiState.update { state ->
             state.copy(
                 messages = state.messages + userMessage,
                 inputText = "",
-                isProcessing = true
+                attachedImageUri = null,
+                isProcessing = true,
+                isThinking = true
             )
         }
 
+        activeAssistantMessageId = null
+        activeAssistantAccumulatedText = ""
+        responseJob?.cancel()
+
+        responseJob = viewModelScope.launch {
+            val userContext = contextGatherer.gather()
+            gemma.generateResponse(messageContent, attachedImage, userContext)
+        }
+    }
+
+    fun stopResponse() {
+        if (!_uiState.value.isProcessing) return
+
+        responseJob?.cancel()
+        gemma.stopGeneration()
+
+        val targetId = activeAssistantMessageId
+        _uiState.update { state ->
+            val updatedMessages = if (targetId != null) {
+                state.messages.map {
+                    if (it.id == targetId) it.copy(isStreaming = false) else it
+                }
+            } else {
+                state.messages
+            }
+
+            state.copy(messages = updatedMessages, isProcessing = false)
+        }
+
+        activeAssistantMessageId = null
+        activeAssistantAccumulatedText = ""
+    }
+
+    fun downloadModel() {
+        if (_uiState.value.isModelLoading || _uiState.value.downloadProgress != null) return
+        
         viewModelScope.launch {
-            // "Thinking" delay
-            delay(1500)
-
-            val responseText = fakeResponses.random()
-            val words = responseText.split(" ")
-            
-            val assistantMessage = AiMessage(
-                role = AiRole.ASSISTANT,
-                content = "",
-                isStreaming = true
-            )
-
-            // Add empty streaming message
-            _uiState.update { state ->
-                state.copy(messages = state.messages + assistantMessage)
-            }
-
-            // Fake token streaming
-            var streamContent = ""
-            for (word in words) {
-                delay((50..120).random().toLong()) // Randomize for realism
-                streamContent += "$word "
-                
-                _uiState.update { state ->
-                    val updatedMessages = state.messages.map {
-                        if (it.id == assistantMessage.id) {
-                            it.copy(content = streamContent)
-                        } else {
-                            it
-                        }
-                    }
-                    state.copy(messages = updatedMessages)
+            _uiState.update { it.copy(isModelLoading = true, errorMessage = null) }
+            try {
+                gemma.downloadModel()
+            } catch (_: Exception) {
+                // Error handled in repository
+            } finally {
+                val loaded = gemma.isModelLoaded()
+                _uiState.update { 
+                    it.copy(
+                        isModelLoaded = loaded, 
+                        isModelLoading = false,
+                        errorMessage = if (!loaded && gemma.isModelDownloaded()) "Engine initialization failed. Your phone's RAM might be too low or the file is corrupt." else null
+                    ) 
                 }
-            }
-
-            // Finalize streaming
-            _uiState.update { state ->
-                val finalMessages = state.messages.map {
-                    if (it.id == assistantMessage.id) {
-                        it.copy(content = streamContent.trim(), isStreaming = false)
-                    } else {
-                        it
-                    }
-                }
-                state.copy(messages = finalMessages, isProcessing = false)
             }
         }
+    }
+
+    fun deleteModel() {
+        viewModelScope.launch {
+            gemma.close()
+            val deleted = gemma.deleteModelFile()
+            _uiState.update { 
+                it.copy(
+                    isModelLoaded = false, 
+                    errorMessage = if (deleted) "Model shard deleted. You can now retry the download." else "Failed to delete model shard."
+                )
+            }
+        }
+    }
+
+    override fun onCleared() {
+        super.onCleared()
+        responseJob?.cancel()
+        gemma.close()
     }
 }

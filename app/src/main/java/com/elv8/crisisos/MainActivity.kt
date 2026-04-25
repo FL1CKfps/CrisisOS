@@ -8,7 +8,6 @@ import androidx.activity.viewModels
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -18,11 +17,15 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import com.elv8.crisisos.ui.components.AppScaffold
+import com.elv8.crisisos.ui.components.LocalTopBarState
+import com.elv8.crisisos.ui.components.TopBarState
 import com.elv8.crisisos.ui.navigation.CrisisNavGraph
 import com.elv8.crisisos.ui.navigation.Screen
 import com.elv8.crisisos.ui.theme.CrisisOSTheme
 import dagger.hilt.android.AndroidEntryPoint
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.remember
 import com.elv8.crisisos.ui.screens.onboarding.OnboardingViewModel
 
 import android.content.Intent
@@ -45,9 +48,9 @@ class MainActivity : ComponentActivity() {
         setContent {
             CrisisOSTheme {
                 val isOnboarded by onboardingViewModel.onboarded.collectAsState()
+                val topBarState = remember { TopBarState() }
 
                 if (isOnboarded == null) {
-                    // Show a simple splash or loading screen if needed
                     return@CrisisOSTheme
                 }
 
@@ -66,17 +69,13 @@ class MainActivity : ComponentActivity() {
 
                 fun handleNotificationIntent(intent: Intent?) {
                     val destination = intent?.getStringExtra("navigate_to") ?: return
-                    android.util.Log.d("CrisisOS_Main", "Notification deep-link: navigate_to=$destination")
                     navController.currentBackStackEntry?.let {
                         try {
                             navController.navigate(destination) {
                                 launchSingleTop = true
                                 restoreState = true
                             }
-                            android.util.Log.d("CrisisOS_Main", "Navigated to: $destination")
-                        } catch (e: Exception) {
-                            android.util.Log.w("CrisisOS_Main", "Navigation failed for $destination: ${e.message}")
-                        }
+                        } catch (e: Exception) { }
                     }
                 }
 
@@ -88,35 +87,25 @@ class MainActivity : ComponentActivity() {
                 val navBackStackEntry by navController.currentBackStackEntryAsState()
                 val currentRoute = navBackStackEntry?.destination?.route
 
-                val showBottomBar = currentRoute != Screen.Sos.route &&
-                                    currentRoute != Screen.DeadManSwitch.route &&
-                                    currentRoute != Screen.Onboarding.route
-
-                val showTopBar = currentRoute == Screen.Home.route
-
-                AppScaffold(
-                    currentRoute = currentRoute,
-                    onNavigate = { route ->
-                        navController.navigate(route) {
-                            popUpTo(Screen.Home.route) {
-                                saveState = true
+                CompositionLocalProvider(LocalTopBarState provides topBarState) {
+                    AppScaffold(
+                        currentRoute = currentRoute,
+                        onNavigate = { route ->
+                            navController.navigate(route) {
+                                popUpTo(Screen.Home.route) {
+                                    saveState = true
+                                }
+                                launchSingleTop = true
+                                restoreState = true
                             }
-                            launchSingleTop = true
-                            restoreState = true
                         }
-                    },
-                    showBottomBar = showBottomBar,
-                    topBar = {
-                        if (showTopBar) {
-                            com.elv8.crisisos.ui.components.CrisisTopBar()
-                        }
+                    ) {
+                        CrisisNavGraph(
+                            navController = navController,
+                            startDestination = if (isOnboarded == true) Screen.Home.route else Screen.Onboarding.route,
+                            modifier = Modifier.fillMaxSize()
+                        )
                     }
-                ) { innerPadding ->
-                    CrisisNavGraph(
-                        navController = navController,
-                        startDestination = if (isOnboarded == true) Screen.Home.route else Screen.Onboarding.route,
-                        modifier = Modifier.fillMaxSize().padding(innerPadding)
-                    )
                 }
             }
         }

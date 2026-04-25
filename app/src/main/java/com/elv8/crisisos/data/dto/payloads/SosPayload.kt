@@ -6,5 +6,8 @@ import kotlinx.serialization.Serializable
 data class SosPayload(
     val sosType: String,
     val message: String,
-    val locationHint: String?
+    val locationHint: String?,
+    val latitude: Double? = null,
+    val longitude: Double? = null,
+    val senderName: String? = null
 )

@@ -19,4 +19,5 @@ interface ThreadChatRepository {
     suspend fun markThreadRead(threadId: String)
     suspend fun deleteThread(threadId: String)
     suspend fun pinThread(threadId: String, pinned: Boolean)
+    suspend fun getOrCreateDirectThread(peerCrsId: String, peerAlias: String, avatarColor: Int): String
 }

@@ -13,23 +13,9 @@ import kotlinx.coroutines.flow.stateIn
 import javax.inject.Inject
 
 @HiltViewModel
-class ChatHubViewModel @Inject constructor(
-    private val messageRequestRepository: MessageRequestRepository,
-    private val connectionRequestRepository: ConnectionRequestRepository
-) : ViewModel() {
+class ChatHubViewModel @Inject constructor() : ViewModel() {
 
     val activeTab: MutableStateFlow<Int> = MutableStateFlow(0)
-
-    val totalRequestCount: StateFlow<Int> = combine(
-        messageRequestRepository.getPendingRequests(),
-        connectionRequestRepository.getIncomingRequests()
-    ) { messages, connections ->
-        messages.size + connections.size
-    }.stateIn(
-        scope = viewModelScope,
-        started = SharingStarted.WhileSubscribed(5000),
-        initialValue = 0
-    )
 
     fun setTab(index: Int) {
         activeTab.value = index

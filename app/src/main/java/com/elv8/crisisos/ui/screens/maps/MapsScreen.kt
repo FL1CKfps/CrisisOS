@@ -31,6 +31,7 @@ import com.elv8.crisisos.core.map.MapOverlayManager
 import com.elv8.crisisos.domain.model.SafeZone
 import com.elv8.crisisos.domain.model.SafeZoneType
 import com.elv8.crisisos.ui.components.CrisisCard
+import com.elv8.crisisos.ui.components.LocalTopBarState
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -39,104 +40,101 @@ fun MapsScreen(
     viewModel: MapsViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+    val topBarState = LocalTopBarState.current
 
-    Scaffold(
-        topBar = {
-            TopAppBar(
-                title = { Text("Offline Maps", fontWeight = FontWeight.Bold) },
-                navigationIcon = {
-                    IconButton(onClick = onNavigateBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
-                    }
-                },
-                colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.background)
-            )
-        },
-        containerColor = MaterialTheme.colorScheme.background
-    ) { paddingValues ->
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(paddingValues)
-        ) {
-            // Mode Toggle
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 16.dp, vertical = 8.dp)
-                    .clip(RoundedCornerShape(8.dp))
-                    .background(MaterialTheme.colorScheme.surfaceVariant)
-            ) {
-                ModeToggleButton(
-                    title = "MAP VIEW",
-                    isSelected = uiState.mapMode == MapMode.MAP,
-                    onClick = { viewModel.setMapMode(MapMode.MAP) },
-                    modifier = Modifier.weight(1f)
-                )
-                ModeToggleButton(
-                    title = "LIST VIEW",
-                    isSelected = uiState.mapMode == MapMode.LIST,
-                    onClick = { viewModel.setMapMode(MapMode.LIST) },
-                    modifier = Modifier.weight(1f)
-                )
+    LaunchedEffect(Unit) {
+        topBarState.update(
+            title = { Text("OFFLINE MAPS", fontWeight = FontWeight.Bold) },
+            navigationIcon = {
+                IconButton(onClick = onNavigateBack) {
+                    Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
+                }
             }
+        )
+    }
 
-            Spacer(modifier = Modifier.height(8.dp))
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(MaterialTheme.colorScheme.background)
+    ) {
+        // Mode Toggle
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp, vertical = 8.dp)
+                .clip(RoundedCornerShape(8.dp))
+                .background(MaterialTheme.colorScheme.surfaceVariant)
+        ) {
+            ModeToggleButton(
+                title = "MAP VIEW",
+                isSelected = uiState.mapMode == MapMode.MAP,
+                onClick = { viewModel.setMapMode(MapMode.MAP) },
+                modifier = Modifier.weight(1f)
+            )
+            ModeToggleButton(
+                title = "LIST VIEW",
+                isSelected = uiState.mapMode == MapMode.LIST,
+                onClick = { viewModel.setMapMode(MapMode.LIST) },
+                modifier = Modifier.weight(1f)
+            )
+        }
 
-            // Crossfade for views
-            Crossfade(targetState = uiState.mapMode, label = "map_mode_crossfade") { mode ->
-                when (mode) {
-                    MapMode.MAP -> {
-                        val context = androidx.compose.ui.platform.LocalContext.current
-                        var overlayManager by remember { mutableStateOf<MapOverlayManager?>(null) }
+        Spacer(modifier = Modifier.height(8.dp))
 
-                        CrisisMapView(
-                            modifier = Modifier.fillMaxSize(),
-                            onMapReady = { mapView ->
-                                overlayManager = MapOverlayManager(context, mapView)
-                                android.util.Log.d("CrisisOS_Map", "Overlay manager initialized")
-                            }
-                        )
+        // Crossfade for views
+        Crossfade(targetState = uiState.mapMode, label = "map_mode_crossfade") { mode ->
+            when (mode) {
+                MapMode.MAP -> {
+                    val context = androidx.compose.ui.platform.LocalContext.current
+                    var overlayManager by remember { mutableStateOf<MapOverlayManager?>(null) }
 
-                        // React to location updates and move the marker
-                        LaunchedEffect(overlayManager, uiState.userLocation) {
-                            val mgr = overlayManager ?: return@LaunchedEffect
-                            val location = uiState.userLocation ?: return@LaunchedEffect
-                            val geoPoint = org.osmdroid.util.GeoPoint(location.latitude, location.longitude)
-                            mgr.updateUserLocation(geoPoint)
+                    CrisisMapView(
+                        modifier = Modifier.fillMaxSize(),
+                        onMapReady = { mapView ->
+                            overlayManager = MapOverlayManager(context, mapView)
+                            android.util.Log.d("CrisisOS_Map", "Overlay manager initialized")
                         }
+                    )
 
-                        // Center map when mapCenter changes
-                        LaunchedEffect(overlayManager, uiState.mapCenter) {
-                            val mgr = overlayManager ?: return@LaunchedEffect
-                            val center = uiState.mapCenter ?: return@LaunchedEffect
-                            mgr.animateTo(
-                                org.osmdroid.util.GeoPoint(center.first, center.second)
-                            )
-                        }
+                    // React to location updates and move the marker
+                    LaunchedEffect(overlayManager, uiState.userLocation) {
+                        val mgr = overlayManager ?: return@LaunchedEffect
+                        val location = uiState.userLocation ?: return@LaunchedEffect
+                        val geoPoint = org.osmdroid.util.GeoPoint(location.latitude, location.longitude)
+                        mgr.updateUserLocation(geoPoint)
                     }
-                    MapMode.LIST -> {
-                        LazyColumn(
-                            contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
-                            verticalArrangement = Arrangement.spacedBy(16.dp),
-                            modifier = Modifier.fillMaxSize()
-                        ) {
-                            item {
-                                Text(
-                                    "SAFE ZONES NEARBY (${uiState.safeZones.size})",
-                                    style = MaterialTheme.typography.titleMedium,
-                                    fontWeight = FontWeight.Bold,
-                                    color = MaterialTheme.colorScheme.primary
-                                )
-                                Spacer(modifier = Modifier.height(4.dp))
-                            }
-                            
-                            items(uiState.safeZones, key = { it.id }) { zone ->
-                                ZoneCard(zone = zone, onClick = { viewModel.selectZone(zone) })
-                            }
-                            
-                            item { Spacer(modifier = Modifier.height(60.dp)) }
+
+                    // Center map when mapCenter changes
+                    LaunchedEffect(overlayManager, uiState.mapCenter) {
+                        val mgr = overlayManager ?: return@LaunchedEffect
+                        val center = uiState.mapCenter ?: return@LaunchedEffect
+                        mgr.animateTo(
+                            org.osmdroid.util.GeoPoint(center.first, center.second)
+                        )
+                    }
+                }
+                MapMode.LIST -> {
+                    LazyColumn(
+                        contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
+                        verticalArrangement = Arrangement.spacedBy(16.dp),
+                        modifier = Modifier.fillMaxSize()
+                    ) {
+                        item {
+                            Text(
+                                "SAFE ZONES NEARBY (${uiState.safeZones.size})",
+                                style = MaterialTheme.typography.titleMedium,
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.primary
+                            )
+                            Spacer(modifier = Modifier.height(4.dp))
                         }
+                        
+                        items(uiState.safeZones, key = { it.id }) { zone ->
+                            ZoneCard(zone = zone, onClick = { viewModel.selectZone(zone) })
+                        }
+                        
+                        item { Spacer(modifier = Modifier.height(60.dp)) }
                     }
                 }
             }

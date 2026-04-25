@@ -37,6 +37,7 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.elv8.crisisos.ui.components.CrisisCard
+import com.elv8.crisisos.ui.components.LocalTopBarState
 import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)@Composable
@@ -47,6 +48,18 @@ fun MissingPersonScreen(
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val pagerState = rememberPagerState(pageCount = { 2 })
     val coroutineScope = rememberCoroutineScope()
+    val topBarState = LocalTopBarState.current
+
+    LaunchedEffect(Unit) {
+        topBarState.update(
+            title = { Text("MISSING PERSONS", fontWeight = FontWeight.Bold) },
+            navigationIcon = {
+                IconButton(onClick = onNavigateBack) {
+                    Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
+                }
+            }
+        )
+    }
 
     LaunchedEffect(pagerState.currentPage) {
         val newMode = if (pagerState.currentPage == 0) SearchMode.SEARCH else SearchMode.REGISTER
@@ -60,45 +73,30 @@ fun MissingPersonScreen(
         }
     }
 
-    Scaffold(
-        topBar = {
-            TopAppBar(
-                title = { Text("Missing Persons") },
-                navigationIcon = {
-                    IconButton(onClick = onNavigateBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
-                    }
-                },
-                colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.background)
+    Column(modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
+        TabRow(
+            selectedTabIndex = pagerState.currentPage,
+            containerColor = MaterialTheme.colorScheme.background
+        ) {
+            Tab(
+                selected = pagerState.currentPage == 0,
+                onClick = { coroutineScope.launch { pagerState.animateScrollToPage(0) } },
+                text = { Text("SEARCH") }
             )
-        },
-        containerColor = MaterialTheme.colorScheme.background
-    ) { paddingValues ->
-        Column(modifier = Modifier.padding(paddingValues).fillMaxSize()) {
-            TabRow(
-                selectedTabIndex = pagerState.currentPage,
-                containerColor = MaterialTheme.colorScheme.background
-            ) {
-                Tab(
-                    selected = pagerState.currentPage == 0,
-                    onClick = { coroutineScope.launch { pagerState.animateScrollToPage(0) } },
-                    text = { Text("SEARCH") }
-                )
-                Tab(
-                    selected = pagerState.currentPage == 1,
-                    onClick = { coroutineScope.launch { pagerState.animateScrollToPage(1) } },
-                    text = { Text("REGISTER") }
-                )
-            }
+            Tab(
+                selected = pagerState.currentPage == 1,
+                onClick = { coroutineScope.launch { pagerState.animateScrollToPage(1) } },
+                text = { Text("REGISTER") }
+            )
+        }
 
-            HorizontalPager(
-                state = pagerState,
-                modifier = Modifier.fillMaxSize()
-            ) { page ->
-                when (page) {
-                    0 -> SearchTabContent(uiState, viewModel)
-                    1 -> RegisterTabContent(uiState, viewModel)
-                }
+        HorizontalPager(
+            state = pagerState,
+            modifier = Modifier.fillMaxSize()
+        ) { page ->
+            when (page) {
+                0 -> SearchTabContent(uiState, viewModel)
+                1 -> RegisterTabContent(uiState, viewModel)
             }
         }
     }

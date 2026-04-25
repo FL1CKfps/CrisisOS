@@ -1,7 +1,7 @@
 package com.elv8.crisisos.domain.model
 
 enum class SupplyType {
-    WATER, FOOD, MEDICINE, SHELTER, BLANKET, EVACUATION, EMERGENCY
+    WATER, FOOD, MEDICINE, SHELTER, BLANKET, EVACUATION, EMERGENCY, OTHER
 }
 
 enum class RequestStatus {

@@ -63,6 +63,7 @@ import androidx.compose.material.icons.filled.AttachFile
 import androidx.compose.material.icons.filled.Mic
 import androidx.compose.material.icons.filled.Stop
 import com.elv8.crisisos.domain.model.MessageType
+import com.elv8.crisisos.ui.components.LocalTopBarState
 
 
 @OptIn(ExperimentalMaterial3Api::class, androidx.compose.foundation.layout.ExperimentalLayoutApi::class)
@@ -77,6 +78,65 @@ fun ChatThreadScreen(
     val uiState by viewModel.uiState.collectAsState()
     val listState = rememberLazyListState()
     val messages = uiState.messages
+    val topBarState = LocalTopBarState.current
+
+    LaunchedEffect(uiState.thread, uiState.isTyping) {
+        val thread = uiState.thread
+        if (thread != null) {
+            topBarState.update(
+                title = {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Box(
+                            modifier = Modifier
+                                .size(36.dp)
+                                .clip(CircleShape)
+                                .background(Color(thread.avatarColor)),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text(
+                                text = thread.displayName.take(1).uppercase(),
+                                color = Color.White,
+                                style = MaterialTheme.typography.titleMedium,
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
+                        Spacer(modifier = Modifier.width(12.dp))
+                        Column {
+                            Text(
+                                text = thread.displayName,
+                                style = MaterialTheme.typography.titleMedium,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                                modifier = Modifier.clickable { 
+                                    thread.peerCrsId?.let { onTapAlias(it) } 
+                                }
+                            )
+                            
+                            if (uiState.isTyping) {
+                                Text(
+                                    text = "typing...",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    fontStyle = FontStyle.Italic,
+                                    color = MaterialTheme.colorScheme.primary
+                                )
+                            } else {
+                                Text(
+                                    text = if (thread.type == ThreadType.GROUP) "Group Chat" else "Direct Chat",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+                        }
+                    }
+                },
+                navigationIcon = {
+                    IconButton(onClick = onNavigateBack) {
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
+                    }
+                }
+            )
+        }
+    }
 
     val snackbarHostState = remember { SnackbarHostState() }
     LaunchedEffect(uiState.mediaErrorMessage) {
@@ -111,87 +171,13 @@ fun ChatThreadScreen(
         }
     }
 
-    Scaffold(
-        modifier = Modifier.fillMaxSize(),
-        topBar = {
-            TopAppBar(
-                title = {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        uiState.thread?.let { thread ->
-                            Box(
-                                modifier = Modifier
-                                    .size(36.dp)
-                                    .clip(CircleShape)
-                                    .background(Color(thread.avatarColor)),
-                                contentAlignment = Alignment.Center
-                            ) {
-                                Text(
-                                    text = thread.displayName.take(1).uppercase(),
-                                    color = Color.White,
-                                    style = MaterialTheme.typography.titleMedium,
-                                    fontWeight = FontWeight.Bold
-                                )
-                            }
-                            Spacer(modifier = Modifier.width(12.dp))
-                            Column {
-                                Text(
-                                    text = thread.displayName,
-                                    style = MaterialTheme.typography.titleMedium,
-                                    maxLines = 1,
-                                    overflow = TextOverflow.Ellipsis,
-                                    modifier = Modifier.clickable { 
-                                        thread.peerCrsId?.let { onTapAlias(it) } 
-                                    }
-                                )
-                                
-                                val transition = rememberInfiniteTransition()
-                                val alpha by transition.animateFloat(
-                                    initialValue = 0.5f,
-                                    targetValue = 1f,
-                                    animationSpec = infiniteRepeatable(
-                                        animation = tween(800),
-                                        repeatMode = RepeatMode.Reverse
-                                    ), label = ""
-                                )
-                                
-                                if (uiState.isTyping) {
-                                    Text(
-                                        text = "typing...",
-                                        style = MaterialTheme.typography.bodySmall,
-                                        fontStyle = FontStyle.Italic,
-                                        color = MaterialTheme.colorScheme.primary.copy(alpha = alpha)
-                                    )
-                                } else {
-                                    Text(
-                                        text = if (thread.type == ThreadType.GROUP) "Group Chat" else "Direct Chat",
-                                        style = MaterialTheme.typography.bodySmall,
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                                    )
-                                }
-                            }
-                        }
-                    }
-                },
-                navigationIcon = {
-                    IconButton(onClick = onNavigateBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
-                    }
-                },
-                colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = MaterialTheme.colorScheme.surface
-                )
-            )
-        },
-        bottomBar = {}
-    ) { padding ->
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(padding)
-                .imePadding()
-                .background(MaterialTheme.colorScheme.background)
-        ) {
-            LazyColumn(
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .imePadding()
+            .background(MaterialTheme.colorScheme.background)
+    ) {
+        LazyColumn(
             state = listState,
             modifier = Modifier
                 .weight(1f).fillMaxWidth()
@@ -420,8 +406,6 @@ fun ChatThreadScreen(
         onConfirmSend = { viewModel.sendPendingMediaMessage() },
         onDiscard = { viewModel.discardPendingAttachment() }
     )
-}
-
 }
 
 @Composable

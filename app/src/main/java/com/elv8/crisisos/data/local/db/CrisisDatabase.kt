@@ -26,7 +26,7 @@ import com.elv8.crisisos.data.local.entity.*
         NotificationLogEntity::class,
         MediaEntity::class
     ],
-    version = 13,
+    version = 14,
     exportSchema = false
 )
 @TypeConverters(Converters::class, CrisisTypeConverters::class)

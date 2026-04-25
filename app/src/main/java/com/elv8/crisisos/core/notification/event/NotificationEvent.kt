@@ -62,7 +62,9 @@ sealed class NotificationEvent {
             val sosType: String,           // MEDICAL, TRAPPED, etc.
             val message: String,
             val locationHint: String?,
-            val hopsAway: Int              // mesh hops from source
+            val hopsAway: Int,              // mesh hops from source
+            val latitude: Double? = null,
+            val longitude: Double? = null
         ) : Sos()
 
         data class OwnAlertBroadcasting(

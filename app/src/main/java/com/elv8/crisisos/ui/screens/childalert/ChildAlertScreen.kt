@@ -29,6 +29,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.elv8.crisisos.domain.model.ChildRecord
 import com.elv8.crisisos.domain.model.ChildStatus
 import com.elv8.crisisos.ui.components.CrisisCard
+import com.elv8.crisisos.ui.components.LocalTopBarState
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -45,100 +46,96 @@ fun ChildAlertScreen(
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val activeCount = uiState.registeredChildren.count { it.status == ChildStatus.SEARCHING }
+    val topBarState = LocalTopBarState.current
 
-    Scaffold(
-        topBar = {
-            TopAppBar(
-                title = { 
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Icon(Icons.Default.ChildCare, contentDescription = null, tint = ChildAlertOrange, modifier = Modifier.size(24.dp))
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Column {
-                            Text("CHILD SEPARATION ALERT", fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleMedium)
-                            Text("Reunification via mesh network", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                        }
-                    }
-                },
-                navigationIcon = {
-                    IconButton(onClick = onNavigateBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
-                    }
-                },
-                actions = {
-                    Surface(
-                        color = ChildAlertAmber.copy(alpha = 0.2f),
-                        shape = RoundedCornerShape(12.dp)
-                    ) {
-                        Text(
-                            text = "$activeCount ACTIVE",
-                            style = MaterialTheme.typography.labelSmall,
-                            fontWeight = FontWeight.Bold,
-                            color = ChildAlertOrange,
-                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
-                        )
-                    }
+    LaunchedEffect(activeCount) {
+        topBarState.update(
+            title = {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(Icons.Default.ChildCare, contentDescription = null, tint = ChildAlertOrange, modifier = Modifier.size(24.dp))
                     Spacer(modifier = Modifier.width(8.dp))
-                },
-                colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.background)
-            )
-        },
-        containerColor = MaterialTheme.colorScheme.background
-    ) { paddingValues ->
-        Column(
+                    Column {
+                        Text("CHILD ALERTS", fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleMedium)
+                        Text("Mesh Reunification", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
+                }
+            },
+            navigationIcon = {
+                IconButton(onClick = onNavigateBack) {
+                    Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
+                }
+            },
+            actions = {
+                Surface(
+                    color = ChildAlertAmber.copy(alpha = 0.2f),
+                    shape = RoundedCornerShape(12.dp)
+                ) {
+                    Text(
+                        text = "$activeCount ACTIVE",
+                        style = MaterialTheme.typography.labelSmall,
+                        fontWeight = FontWeight.Bold,
+                        color = ChildAlertOrange,
+                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                    )
+                }
+            }
+        )
+    }
+
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(MaterialTheme.colorScheme.background)
+    ) {
+        LazyColumn(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(paddingValues)
+                .padding(horizontal = 16.dp),
+            verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
-            LazyColumn(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(horizontal = 16.dp),
-                verticalArrangement = Arrangement.spacedBy(16.dp)
-            ) {
-                // Determine whether to show Form or Confirmation Card
-                item {
-                    Spacer(modifier = Modifier.height(8.dp))
-                    AnimatedContent(
-                        targetState = uiState.newlyRegisteredChild != null,
-                        label = "form_or_success"
-                    ) { showSuccess ->
-                        if (showSuccess) {
-                            uiState.newlyRegisteredChild?.let { newChild ->
-                                SuccessCard(
-                                    childRecord = newChild,
-                                    onDismiss = viewModel::dismissConfirmation
-                                )
-                            }
-                        } else {
-                            RegistrationForm(
-                                formState = uiState.registrationForm,
-                                isRegistering = uiState.isRegistering,
-                                onUpdateForm = viewModel::updateForm,
-                                onIncrementAge = viewModel::incrementAge,
-                                onDecrementAge = viewModel::decrementAge,
-                                onRegister = viewModel::registerChild
+            // Determine whether to show Form or Confirmation Card
+            item {
+                Spacer(modifier = Modifier.height(8.dp))
+                AnimatedContent(
+                    targetState = uiState.newlyRegisteredChild != null,
+                    label = "form_or_success"
+                ) { showSuccess ->
+                    if (showSuccess) {
+                        uiState.newlyRegisteredChild?.let { newChild ->
+                            SuccessCard(
+                                childRecord = newChild,
+                                onDismiss = viewModel::dismissConfirmation
                             )
                         }
+                    } else {
+                        RegistrationForm(
+                            formState = uiState.registrationForm,
+                            isRegistering = uiState.isRegistering,
+                            onUpdateForm = viewModel::updateForm,
+                            onIncrementAge = viewModel::incrementAge,
+                            onDecrementAge = viewModel::decrementAge,
+                            onRegister = viewModel::registerChild
+                        )
                     }
                 }
-
-                item {
-                    Spacer(modifier = Modifier.height(8.dp))
-                    Text(
-                        text = "ACTIVE ALERTS",
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.Bold,
-                        color = MaterialTheme.colorScheme.primary
-                    )
-                    HorizontalDivider(modifier = Modifier.padding(top = 8.dp, bottom = 4.dp))
-                }
-
-                items(uiState.registeredChildren, key = { it.crsChildId }) { alert ->
-                    ChildAlertCard(record = alert)
-                }
-
-                item { Spacer(modifier = Modifier.height(40.dp)) }
             }
+
+            item {
+                Spacer(modifier = Modifier.height(8.dp))
+                Text(
+                    text = "ACTIVE ALERTS",
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.primary
+                )
+                HorizontalDivider(modifier = Modifier.padding(top = 8.dp, bottom = 4.dp))
+            }
+
+            items(uiState.registeredChildren, key = { it.crsChildId }) { alert ->
+                ChildAlertCard(record = alert)
+            }
+
+            item { Spacer(modifier = Modifier.height(40.dp)) }
         }
     }
 }

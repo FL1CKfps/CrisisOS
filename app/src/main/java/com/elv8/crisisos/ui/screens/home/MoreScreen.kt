@@ -60,11 +60,11 @@ fun MoreScreen(
             FeatureItem("2", "SOS Broadcast", "Multi-hop emergency alert", Icons.Filled.Warning, Screen.Sos.route, FeatureStatus.AVAILABLE),
             FeatureItem("3", "Dead Man's Switch", "Auto-alert on no check-in", Icons.Filled.Timer, Screen.DeadManSwitch.route, FeatureStatus.BETA),
             FeatureItem("4", "Missing Person", "Find family via mesh", Icons.Filled.PersonSearch, Screen.MissingPerson.route, FeatureStatus.BETA),
-            FeatureItem("5", "Supply Request", "Request aid offline", Icons.Filled.Inventory, Screen.Supply.route, FeatureStatus.AVAILABLE),
+            FeatureItem("5", "Supply Request", "Request aid offline", Icons.Filled.Inventory, Screen.Supply().route, FeatureStatus.AVAILABLE),
             FeatureItem("6", "Offline Maps", "Safe zones, no internet", Icons.Filled.Map, Screen.Maps.route, FeatureStatus.OFFLINE_READY),
             FeatureItem("7", "Danger Zone", "Live threat detection", Icons.Filled.LocationOff, Screen.DangerZone.route, FeatureStatus.BETA),
             FeatureItem("8", "Checkpoint Intel", "Safety ratings, status", Icons.Filled.Shield, Screen.Checkpoint.route, FeatureStatus.COMING_SOON),
-            FeatureItem("9", "AI Assistant", "On-device Gemini Nano", Icons.Filled.Psychology, Screen.AiAssistant.route, FeatureStatus.AVAILABLE),
+            FeatureItem("9", "AI Assistant", "On-device Gemma 4 E2B", Icons.Filled.Psychology, Screen.AiAssistant.route, FeatureStatus.AVAILABLE),
             FeatureItem("10", "Fake News", "Verify information", Icons.Filled.FactCheck, Screen.FakeNews.route, FeatureStatus.BETA),
             FeatureItem("11", "Deconfliction", "Geneva protocol reports", Icons.Filled.Gavel, Screen.Deconfliction.route, FeatureStatus.COMING_SOON),
             FeatureItem("12", "Child Alert", "Separation alert system", Icons.Filled.ChildCare, Screen.ChildAlert.route, FeatureStatus.BETA),
@@ -74,7 +74,7 @@ fun MoreScreen(
 
     LazyVerticalGrid(
         columns = GridCells.Fixed(2),
-        contentPadding = PaddingValues(16.dp),
+        contentPadding = PaddingValues(start = 16.dp, end = 16.dp, bottom = 16.dp, top = 0.dp),
         horizontalArrangement = Arrangement.spacedBy(16.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp),
         modifier = modifier.fillMaxSize()

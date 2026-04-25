@@ -29,6 +29,7 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.elv8.crisisos.domain.model.Checkpoint
 import com.elv8.crisisos.ui.components.CrisisCard
+import com.elv8.crisisos.ui.components.LocalTopBarState
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -37,61 +38,58 @@ fun CheckpointScreen(
     viewModel: CheckpointViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+    val topBarState = LocalTopBarState.current
 
-    Scaffold(
-        topBar = {
-            TopAppBar(
-                title = { Text("Checkpoint Intelligence", fontWeight = FontWeight.Bold) },
-                navigationIcon = {
-                    IconButton(onClick = onNavigateBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
-                    }
-                },
-                actions = {
-                    IconButton(onClick = { viewModel.refreshCheckpoints() }) {
-                        Icon(Icons.Default.Refresh, contentDescription = "Refresh Data")
-                    }
-                },
-                colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.background)
+    LaunchedEffect(Unit) {
+        topBarState.update(
+            title = { Text("CHECKPOINT INTEL", fontWeight = FontWeight.Bold) },
+            navigationIcon = {
+                IconButton(onClick = onNavigateBack) {
+                    Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
+                }
+            },
+            actions = {
+                IconButton(onClick = { viewModel.refreshCheckpoints() }) {
+                    Icon(Icons.Default.Refresh, contentDescription = "Refresh")
+                }
+            }
+        )
+    }
+
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(MaterialTheme.colorScheme.background)
+    ) {
+        Spacer(modifier = Modifier.height(16.dp))
+
+        SectionHeader(title = "CHECKPOINTS NEARBY", count = uiState.checkpoints.size)
+
+        Spacer(modifier = Modifier.height(12.dp))
+
+        if (uiState.isLoading) {
+            Box(modifier = Modifier.fillMaxWidth().padding(32.dp), contentAlignment = Alignment.Center) {
+                CircularProgressIndicator()
+            }
+        } else if (uiState.checkpoints.isEmpty()) {
+            EmptyState(
+                icon = Icons.Default.Security,
+                title = "Clear Route",
+                subtitle = "No active checkpoints reported nearby.",
+                actionLabel = "Refresh Maps",
+                onAction = { viewModel.refreshCheckpoints() }
             )
-        },
-        containerColor = MaterialTheme.colorScheme.background
-    ) { paddingValues ->
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(paddingValues)
-        ) {
-            Spacer(modifier = Modifier.height(16.dp))
-
-            SectionHeader(title = "CHECKPOINTS NEARBY", count = uiState.checkpoints.size)
-
-            Spacer(modifier = Modifier.height(12.dp))
-
-            if (uiState.isLoading) {
-                Box(modifier = Modifier.fillMaxWidth().padding(32.dp), contentAlignment = Alignment.Center) {
-                    CircularProgressIndicator()
-                }
-            } else if (uiState.checkpoints.isEmpty()) {
-                EmptyState(
-                    icon = Icons.Default.Security,
-                    title = "Clear Route",
-                    subtitle = "No active checkpoints reported nearby.",
-                    actionLabel = "Refresh Maps",
-                    onAction = { viewModel.refreshCheckpoints() }
-                )
-            } else {
-                LazyColumn(
-                    modifier = Modifier.fillMaxSize().padding(horizontal = 16.dp),
-                    verticalArrangement = Arrangement.spacedBy(16.dp)
-                ) {
-                    items(uiState.checkpoints, key = { it.id }) { checkpoint ->
-                        CheckpointCard(checkpoint = checkpoint) {
-                            viewModel.selectCheckpoint(it)
-                        }
+        } else {
+            LazyColumn(
+                modifier = Modifier.fillMaxSize().padding(horizontal = 16.dp),
+                verticalArrangement = Arrangement.spacedBy(16.dp)
+            ) {
+                items(uiState.checkpoints, key = { it.id }) { checkpoint ->
+                    CheckpointCard(checkpoint = checkpoint) {
+                        viewModel.selectCheckpoint(it)
                     }
-                    item { Spacer(modifier = Modifier.height(80.dp)) }
                 }
+                item { Spacer(modifier = Modifier.height(80.dp)) }
             }
         }
     }

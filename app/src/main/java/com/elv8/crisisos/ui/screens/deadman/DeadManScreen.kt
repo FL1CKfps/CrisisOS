@@ -29,20 +29,8 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Person
-import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.FilterChip
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Text
-import androidx.compose.material3.TopAppBar
-import androidx.compose.material3.TopAppBarDefaults
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -52,6 +40,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.elv8.crisisos.ui.components.LocalTopBarState
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -60,71 +49,68 @@ fun DeadManScreen(
     viewModel: DeadManViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+    val topBarState = LocalTopBarState.current
 
-    Scaffold(
-        topBar = {
-            TopAppBar(
-                title = { Text("Dead Man's Switch") },
-                navigationIcon = {
-                    IconButton(onClick = onNavigateBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
-                    }
-                },
-                colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.background)
-            )
-        },
-        containerColor = MaterialTheme.colorScheme.background
-    ) { paddingValues ->
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(paddingValues)
-                .padding(horizontal = 24.dp),
-            horizontalAlignment = Alignment.CenterHorizontally
-        ) {
-            Spacer(modifier = Modifier.height(16.dp))
-
-            TimerSection(uiState = uiState)
-
-            Spacer(modifier = Modifier.height(32.dp))
-
-            if (uiState.isActive) {
-                Button(
-                    onClick = { viewModel.checkIn() },
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(64.dp),
-                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF4CAF50)),
-                    shape = RoundedCornerShape(16.dp)
-                ) {
-                    Text("CHECK IN NOW", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold, color = Color.White)
+    LaunchedEffect(Unit) {
+        topBarState.update(
+            title = { Text("DEAD MAN'S SWITCH", fontWeight = FontWeight.Bold) },
+            navigationIcon = {
+                IconButton(onClick = onNavigateBack) {
+                    Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
                 }
             }
+        )
+    }
 
-            Spacer(modifier = Modifier.height(24.dp))
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(MaterialTheme.colorScheme.background)
+            .padding(horizontal = 24.dp),
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+        Spacer(modifier = Modifier.height(16.dp))
 
-            AnimatedVisibility(
-                visible = !uiState.isActive,
-                enter = expandVertically(),
-                exit = shrinkVertically()
+        TimerSection(uiState = uiState)
+
+        Spacer(modifier = Modifier.height(32.dp))
+
+        if (uiState.isActive) {
+            Button(
+                onClick = { viewModel.checkIn() },
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(64.dp),
+                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF4CAF50)),
+                shape = RoundedCornerShape(16.dp)
             ) {
-                SettingsSection(
-                    uiState = uiState,
-                    onIntervalSelected = viewModel::setInterval,
-                    onMessageChange = viewModel::updateAlertMessage,
-                    onAddContact = { viewModel.addContact("New Contact") },
-                    onRemoveContact = viewModel::removeContact
-                )
+                Text("CHECK IN NOW", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold, color = Color.White)
             }
-
-            Spacer(modifier = Modifier.weight(1f))
-
-            ActivateToggle(uiState = uiState, onToggle = { 
-                if (uiState.isActive) viewModel.deactivate() else viewModel.activate() 
-            })
-            
-            Spacer(modifier = Modifier.height(24.dp))
         }
+
+        Spacer(modifier = Modifier.height(24.dp))
+
+        AnimatedVisibility(
+            visible = !uiState.isActive,
+            enter = expandVertically(),
+            exit = shrinkVertically()
+        ) {
+            SettingsSection(
+                uiState = uiState,
+                onIntervalSelected = viewModel::setInterval,
+                onMessageChange = viewModel::updateAlertMessage,
+                onAddContact = { viewModel.addContact("New Contact") },
+                onRemoveContact = viewModel::removeContact
+            )
+        }
+
+        Spacer(modifier = Modifier.weight(1f))
+
+        ActivateToggle(uiState = uiState, onToggle = { 
+            if (uiState.isActive) viewModel.deactivate() else viewModel.activate() 
+        })
+        
+        Spacer(modifier = Modifier.height(24.dp))
     }
 }
 
@@ -305,4 +291,3 @@ fun ActivateToggle(uiState: DeadManUiState, onToggle: () -> Unit) {
         }
     }
 }
-

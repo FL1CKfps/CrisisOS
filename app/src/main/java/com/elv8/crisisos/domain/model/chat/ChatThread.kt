@@ -18,5 +18,5 @@ data class ChatThread(
     val isMuted: Boolean,
     val isMock: Boolean = false,
     val createdAt: Long,
-    val connectionRequestId: String
+    val connectionRequestId: String?
 )

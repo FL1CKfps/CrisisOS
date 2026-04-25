@@ -32,6 +32,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.elv8.crisisos.domain.model.Verdict
 import com.elv8.crisisos.domain.model.VerificationResult
 import com.elv8.crisisos.ui.components.CrisisCard
+import com.elv8.crisisos.ui.components.LocalTopBarState
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
@@ -40,117 +41,114 @@ fun FakeNewsScreen(
     viewModel: FakeNewsViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+    val topBarState = LocalTopBarState.current
 
-    Scaffold(
-        topBar = {
-            TopAppBar(
-                title = { Text("Fake News Detector", fontWeight = FontWeight.Bold) },
-                navigationIcon = {
-                    IconButton(onClick = onNavigateBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
-                    }
-                },
-                colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.background)
-            )
-        },
-        containerColor = MaterialTheme.colorScheme.background
-    ) { paddingValues ->
-        Column(
+    LaunchedEffect(Unit) {
+        topBarState.update(
+            title = { Text("FAKE NEWS DETECTOR", fontWeight = FontWeight.Bold) },
+            navigationIcon = {
+                IconButton(onClick = onNavigateBack) {
+                    Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
+                }
+            }
+        )
+    }
+
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(MaterialTheme.colorScheme.background)
+            .padding(16.dp)
+    ) {
+        
+        // Input Section
+        Text("VERIFY INFORMATION", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
+        Spacer(modifier = Modifier.height(12.dp))
+        OutlinedTextField(
+            value = uiState.claimInput,
+            onValueChange = viewModel::updateInput,
+            label = { Text("Paste a claim or news item to verify...") },
             modifier = Modifier
-                .fillMaxSize()
-                .padding(paddingValues)
-                .padding(16.dp)
+                .fillMaxWidth()
+                .height(120.dp),
+            shape = RoundedCornerShape(12.dp),
+            maxLines = 5,
+            enabled = !uiState.isAnalyzing
+        )
+        Spacer(modifier = Modifier.height(12.dp))
+        
+        Button(
+            onClick = viewModel::analyzeClaim,
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(56.dp),
+            enabled = uiState.claimInput.isNotBlank() && !uiState.isAnalyzing,
+            colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary),
+            shape = RoundedCornerShape(12.dp)
         ) {
-            
-            // Input Section
-            Text("VERIFY INFORMATION", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
-            Spacer(modifier = Modifier.height(12.dp))
-            OutlinedTextField(
-                value = uiState.claimInput,
-                onValueChange = viewModel::updateInput,
-                label = { Text("Paste a claim or news item to verify...") },
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(120.dp),
-                shape = RoundedCornerShape(12.dp),
-                maxLines = 5,
-                enabled = !uiState.isAnalyzing
-            )
-            Spacer(modifier = Modifier.height(12.dp))
-            
-            Button(
-                onClick = viewModel::analyzeClaim,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(56.dp),
-                enabled = uiState.claimInput.isNotBlank() && !uiState.isAnalyzing,
-                colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary),
-                shape = RoundedCornerShape(12.dp)
-            ) {
-                if (uiState.isAnalyzing) {
-                    CircularProgressIndicator(
-                        color = MaterialTheme.colorScheme.onPrimary,
-                        modifier = Modifier.size(24.dp),
-                        strokeWidth = 2.dp
-                    )
-                    Spacer(modifier = Modifier.width(12.dp))
-                    Text("CROSS-REFERENCING NODE DATA...", fontWeight = FontWeight.Bold)
-                } else {
-                    Text("ANALYZE CLAIM", fontWeight = FontWeight.Bold)
-                }
+            if (uiState.isAnalyzing) {
+                CircularProgressIndicator(
+                    color = MaterialTheme.colorScheme.onPrimary,
+                    modifier = Modifier.size(24.dp),
+                    strokeWidth = 2.dp
+                )
+                Spacer(modifier = Modifier.width(12.dp))
+                Text("CROSS-REFERENCING NODE DATA...", fontWeight = FontWeight.Bold)
+            } else {
+                Text("ANALYZE CLAIM", fontWeight = FontWeight.Bold)
             }
-            
-            Text(
-                "Powered by GDELT cross-reference",
-                style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(top = 8.dp),
-                textAlign = TextAlign.Center
-            )
+        }
+        
+        Text(
+            "Powered by GDELT cross-reference",
+            style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(top = 8.dp),
+            textAlign = TextAlign.Center
+        )
 
-            Spacer(modifier = Modifier.height(24.dp))
+        Spacer(modifier = Modifier.height(24.dp))
 
-            // Interactive results section
-            AnimatedVisibility(
-                visible = uiState.result != null,
-                enter = slideInVertically(initialOffsetY = { it / 2 }) + fadeIn(),
-                exit = fadeOut()
-            ) {
-                uiState.result?.let { result ->
-                    ResultCard(result = result)
-                }
+        // Interactive results section
+        AnimatedVisibility(
+            visible = uiState.result != null,
+            enter = slideInVertically(initialOffsetY = { it / 2 }) + fadeIn(),
+            exit = fadeOut()
+        ) {
+            uiState.result?.let { result ->
+                ResultCard(result = result)
             }
+        }
 
-            // Display empty state or Recent Checks depending on result state
-            if (uiState.result == null && uiState.recentChecks.isEmpty() && !uiState.isAnalyzing) {
-                Box(modifier = Modifier.fillMaxWidth().weight(1f), contentAlignment = Alignment.Center) {
-                    EmptyState(
-                        icon = Icons.Default.VerifiedUser,
-                        title = "Verify Intelligence",
-                        subtitle = "In crisis zones, disinformation spreads faster than aid. Verify before you share."
+        // Display empty state or Recent Checks depending on result state
+        if (uiState.result == null && uiState.recentChecks.isEmpty() && !uiState.isAnalyzing) {
+            Box(modifier = Modifier.fillMaxWidth().weight(1f), contentAlignment = Alignment.Center) {
+                EmptyState(
+                    icon = Icons.Default.VerifiedUser,
+                    title = "Verify Intelligence",
+                    subtitle = "In crisis zones, disinformation spreads faster than aid. Verify before you share."
+                )
+            }
+        }
+
+        Spacer(modifier = Modifier.height(24.dp))
+
+        if (uiState.recentChecks.isNotEmpty()) {
+            Text("RECENT CHECKS", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
+            Spacer(modifier = Modifier.height(12.dp))
+            LazyColumn(
+                verticalArrangement = Arrangement.spacedBy(12.dp),
+                modifier = Modifier.weight(1f)
+            ) {
+                items(uiState.recentChecks, key = { it.id }) { recent ->
+                    RecentCheckItem(
+                        result = recent,
+                        onClick = { viewModel.selectRecentCheck(recent) }
                     )
                 }
-            }
-
-            Spacer(modifier = Modifier.height(24.dp))
-
-            if (uiState.recentChecks.isNotEmpty()) {
-                Text("RECENT CHECKS", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
-                Spacer(modifier = Modifier.height(12.dp))
-                LazyColumn(
-                    verticalArrangement = Arrangement.spacedBy(12.dp),
-                    modifier = Modifier.weight(1f)
-                ) {
-                    items(uiState.recentChecks, key = { it.id }) { recent ->
-                        RecentCheckItem(
-                            result = recent,
-                            onClick = { viewModel.selectRecentCheck(recent) }
-                        )
-                    }
-                    item { Spacer(modifier = Modifier.height(40.dp)) }
-                }
+                item { Spacer(modifier = Modifier.height(40.dp)) }
             }
         }
     }

@@ -36,6 +36,8 @@ import com.elv8.crisisos.ui.screens.missingperson.MissingPersonScreen
 import com.elv8.crisisos.ui.screens.sos.SosScreen
 import com.elv8.crisisos.ui.screens.supply.SupplyScreen
 import com.elv8.crisisos.ui.screens.chat.ChatHubScreen
+import com.elv8.crisisos.ui.screens.news.CrisisNewsScreen
+import com.elv8.crisisos.ui.screens.community.CommunityBoardScreen
 
 @Composable
 fun CrisisNavGraph(
@@ -65,9 +67,7 @@ fun CrisisNavGraph(
         } 
         composable(Screen.ChatHub.route) {
             ChatHubScreen(
-                onNavigateToThread = { threadId -> navController.navigate(Screen.ChatThread().createRoute(threadId)) },
-                onNavigateToRequest = { navController.navigate(Screen.MessageRequests.route) },
-                onNavigateToConnectionRequest = { crsId -> navController.navigate(Screen.ConnectionRequest.route + "/$crsId") }
+                onNavigateToThread = { threadId -> navController.navigate(Screen.ChatThread().createRoute(threadId)) }
             )
         }
         composable(Screen.ChatList.route) {
@@ -105,8 +105,20 @@ fun CrisisNavGraph(
         composable(Screen.MissingPerson.route) { 
             MissingPersonScreen(onNavigateBack = { navController.popBackStack() }) 
         }
-        composable(Screen.Supply.route) { 
-            SupplyScreen(onNavigateBack = { navController.popBackStack() }) 
+        composable(
+            route = Screen.Supply().route,
+            arguments = listOf(
+                androidx.navigation.navArgument("category") { type = androidx.navigation.NavType.StringType; nullable = true },
+                androidx.navigation.navArgument("notes") { type = androidx.navigation.NavType.StringType; nullable = true }
+            )
+        ) { backStack ->
+            val category = backStack.arguments?.getString("category")
+            val notes = backStack.arguments?.getString("notes")
+            SupplyScreen(
+                initialCategory = category,
+                initialNotes = notes,
+                onNavigateBack = { navController.popBackStack() }
+            )
         }
         composable(Screen.Maps.route) { 
             MapsScreen(onNavigateBack = { navController.popBackStack() }) 
@@ -118,7 +130,24 @@ fun CrisisNavGraph(
             CheckpointScreen(onNavigateBack = { navController.popBackStack() }) 
         }
         composable(Screen.AiAssistant.route) { 
-            AiAssistantScreen(onNavigateBack = { navController.popBackStack() }) 
+            AiAssistantScreen(
+                onNavigateBack = { navController.popBackStack() },
+                onNavigateToFeature = { feature, params ->
+                    when (feature) {
+                        "SUPPLY_REQUEST" -> {
+                            val cat = params["category"]
+                            val note = params["notes"]
+                            navController.navigate(Screen.Supply().createRoute(cat, note))
+                        }
+                        "OFFLINE_MAPS" -> navController.navigate(Screen.Maps.route)
+                        "MISSING_PERSON" -> navController.navigate(Screen.MissingPerson.route)
+                        "SOS" -> navController.navigate(Screen.Sos.route)
+                        "CHECKPOINT_INTEL" -> navController.navigate(Screen.Checkpoint.route)
+                        "CRISIS_NEWS" -> navController.navigate(Screen.CrisisNews.route)
+                        else -> android.util.Log.w("AiNav", "Unknown feature: $feature")
+                    }
+                }
+            )
         }
         composable(Screen.FakeNews.route) { 
             FakeNewsScreen(onNavigateBack = { navController.popBackStack() }) 
@@ -129,10 +158,16 @@ fun CrisisNavGraph(
         composable(Screen.ChildAlert.route) {
             ChildAlertScreen(onNavigateBack = { navController.popBackStack() }) 
         }
+        composable(Screen.CrisisNews.route) {
+            CrisisNewsScreen(onNavigateBack = { navController.popBackStack() })
+        }
+        composable(Screen.CommunityBoard.route) {
+            CommunityBoardScreen(onNavigateBack = { navController.popBackStack() })
+        }
 
         composable(Screen.PeerDiscovery.route) {
             PeerDiscoveryScreen(
-                onNavigateToConnectionRequest = { crsId -> navController.navigate(Screen.ConnectionRequest.route + "/$crsId") },
+                onNavigateToChat = { threadId -> navController.navigate(Screen.ChatThread().createRoute(threadId)) },
                 onNavigateBack = { navController.popBackStack() }
             )
         }

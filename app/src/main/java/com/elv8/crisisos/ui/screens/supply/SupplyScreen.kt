@@ -7,12 +7,13 @@ import androidx.compose.animation.*
 import androidx.compose.animation.core.*
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.shape.CircleShape
@@ -22,6 +23,7 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.DirectionsRun
 import androidx.compose.material.icons.automirrored.filled.Send
 import androidx.compose.material.icons.filled.*
+import androidx.compose.material.icons.outlined.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -37,10 +39,13 @@ import com.elv8.crisisos.domain.model.RequestStatus
 import com.elv8.crisisos.domain.model.SupplyRequest
 import com.elv8.crisisos.domain.model.SupplyType
 import com.elv8.crisisos.ui.components.CrisisCard
+import com.elv8.crisisos.ui.components.LocalTopBarState
 import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)@Composable
 fun SupplyScreen(
+    initialCategory: String? = null,
+    initialNotes: String? = null,
     onNavigateBack: () -> Unit,
     viewModel: SupplyViewModel = hiltViewModel()
 ) {
@@ -48,48 +53,49 @@ fun SupplyScreen(
     val pagerState = rememberPagerState(pageCount = { 2 })
     val coroutineScope = rememberCoroutineScope()
 
-    Scaffold(
-        topBar = {
-            TopAppBar(
-                title = { Text("Supply Requests") },
-                navigationIcon = {
-                    IconButton(onClick = onNavigateBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
-                    }
-                },
-                colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.background)
-            )
-        },
-        containerColor = MaterialTheme.colorScheme.background
-    ) { paddingValues ->
-        Column(modifier = Modifier.padding(paddingValues).fillMaxSize()) {
-            if (uiState.currentStep < 3) {
-                TabRow(
-                    selectedTabIndex = pagerState.currentPage,
-                    containerColor = MaterialTheme.colorScheme.background
-                ) {
-                    Tab(
-                        selected = pagerState.currentPage == 0,
-                        onClick = { coroutineScope.launch { pagerState.animateScrollToPage(0) } },
-                        text = { Text("NEW REQUEST") }
-                    )
-                    Tab(
-                        selected = pagerState.currentPage == 1,
-                        onClick = { coroutineScope.launch { pagerState.animateScrollToPage(1) } },
-                        text = { Text("MY REQUESTS") }
-                    )
+    LaunchedEffect(initialCategory, initialNotes) {
+        viewModel.applyPrefill(initialCategory, initialNotes)
+    }
+    val topBarState = LocalTopBarState.current
+
+    LaunchedEffect(uiState.currentStep) {
+        topBarState.update(
+            title = { Text("SUPPLY REQUESTS", fontWeight = FontWeight.Bold) },
+            navigationIcon = {
+                IconButton(onClick = onNavigateBack) {
+                    Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
                 }
             }
+        )
+    }
 
-            HorizontalPager(
-                state = pagerState,
-                modifier = Modifier.fillMaxSize(),
-                userScrollEnabled = uiState.currentStep < 3 // Disable scroll during active wizard
-            ) { page ->
-                when (page) {
-                    0 -> NewRequestTab(uiState, viewModel)
-                    1 -> MyRequestsTab(uiState.activeRequests, viewModel::cancelRequest)
-                }
+    Column(modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
+        if (uiState.currentStep < 3) {
+            TabRow(
+                selectedTabIndex = pagerState.currentPage,
+                containerColor = MaterialTheme.colorScheme.background
+            ) {
+                Tab(
+                    selected = pagerState.currentPage == 0,
+                    onClick = { coroutineScope.launch { pagerState.animateScrollToPage(0) } },
+                    text = { Text("NEW REQUEST") }
+                )
+                Tab(
+                    selected = pagerState.currentPage == 1,
+                    onClick = { coroutineScope.launch { pagerState.animateScrollToPage(1) } },
+                    text = { Text("MY REQUESTS") }
+                )
+            }
+        }
+
+        HorizontalPager(
+            state = pagerState,
+            modifier = Modifier.fillMaxSize(),
+            userScrollEnabled = uiState.currentStep < 3 // Disable scroll during active wizard
+        ) { page ->
+            when (page) {
+                0 -> NewRequestTab(uiState, viewModel)
+                1 -> MyRequestsTab(uiState.activeRequests, viewModel::cancelRequest)
             }
         }
     }
@@ -116,64 +122,114 @@ fun NewRequestTab(uiState: SupplyUiState, viewModel: SupplyViewModel) {
 
 @Composable
 fun SupplyTypeSelection(uiState: SupplyUiState, viewModel: SupplyViewModel) {
+    val supplyTypes = SupplyType.entries.toTypedArray()
+    
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .padding(16.dp),
-        horizontalAlignment = Alignment.CenterHorizontally
+            .padding(16.dp)
     ) {
-        Spacer(modifier = Modifier.height(24.dp))
-        Text("What do you need?", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
-        Text("Select the most critical supply category.", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
-        Spacer(modifier = Modifier.height(32.dp))
+        Text(
+            text = "Select assistance needed",
+            style = MaterialTheme.typography.headlineSmall,
+            fontWeight = FontWeight.ExtraBold,
+            modifier = Modifier.padding(bottom = 8.dp)
+        )
+        Text(
+            text = "Your request will be broadcasted to all nearby rescue nodes.",
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.padding(bottom = 24.dp)
+        )
 
-        // Icons map
-        val supplyTypes = SupplyType.entries.toTypedArray()
-        
-        LazyRow(
-            horizontalArrangement = Arrangement.spacedBy(16.dp),
-            modifier = Modifier.fillMaxWidth()
+        LazyColumn(
+            verticalArrangement = Arrangement.spacedBy(12.dp),
+            modifier = Modifier.weight(1f)
         ) {
             items(supplyTypes) { type ->
                 val isSelected = uiState.selectedType == type
-                val bgColor = if (isSelected) Color(0xFFFF9800).copy(alpha = 0.15f) else MaterialTheme.colorScheme.surfaceVariant
-                val borderColor = if (isSelected) Color(0xFFFF9800) else Color.Transparent
-                val contentColor = if (isSelected) Color(0xFFFF9800) else MaterialTheme.colorScheme.onSurfaceVariant
-                
-                Column(
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                    modifier = Modifier.width(96.dp)
-                ) {
-                    Box(
-                        modifier = Modifier
-                            .size(72.dp)
-                            .clip(CircleShape)
-                            .background(bgColor)
-                            .border(2.dp, borderColor, CircleShape)
-                            .clickable { viewModel.selectType(type) },
-                        contentAlignment = Alignment.Center
-                    ) {
-                        val icon = when (type) {
-                            SupplyType.WATER -> Icons.Default.Build // Placeholder for water
-                            SupplyType.FOOD -> Icons.Default.ShoppingCart
-                            SupplyType.MEDICINE -> Icons.Default.Add
-                            SupplyType.SHELTER -> Icons.Default.Home
-                            SupplyType.BLANKET -> Icons.Default.Favorite
-                            SupplyType.EVACUATION -> Icons.AutoMirrored.Filled.DirectionsRun
-                            SupplyType.EMERGENCY -> Icons.Default.Warning
-                        }
-                        Icon(icon, contentDescription = type.name, tint = contentColor, modifier = Modifier.size(32.dp))
-                    }
-                    Spacer(modifier = Modifier.height(8.dp))
-                    Text(
-                        text = type.name,
-                        style = MaterialTheme.typography.labelMedium,
-                        fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
-                        color = contentColor
-                    )
-                }
+                SupplyTypeCard(
+                    type = type,
+                    isSelected = isSelected,
+                    onClick = { viewModel.selectType(type) }
+                )
             }
         }
+    }
+}
+
+@Composable
+fun SupplyTypeCard(
+    type: SupplyType,
+    isSelected: Boolean,
+    onClick: () -> Unit
+) {
+    val borderColor = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outlineVariant
+    val containerColor = if (isSelected) MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.3f) else MaterialTheme.colorScheme.surface
+    
+    Card(
+        onClick = onClick,
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(16.dp),
+        border = androidx.compose.foundation.BorderStroke(if (isSelected) 2.dp else 1.dp, borderColor),
+        colors = CardDefaults.cardColors(containerColor = containerColor)
+    ) {
+        Row(
+            modifier = Modifier
+                .padding(16.dp)
+                .fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(48.dp)
+                    .clip(CircleShape)
+                    .background(if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceVariant),
+                contentAlignment = Alignment.Center
+            ) {
+                val icon = when (type) {
+                    SupplyType.WATER -> Icons.Default.WaterDrop
+                    SupplyType.FOOD -> Icons.Default.Restaurant
+                    SupplyType.MEDICINE -> Icons.Default.MedicalServices
+                    SupplyType.SHELTER -> Icons.Default.Cottage
+                    SupplyType.BLANKET -> Icons.Default.Bed
+                    SupplyType.EVACUATION -> Icons.AutoMirrored.Filled.DirectionsRun
+                    SupplyType.EMERGENCY -> Icons.Default.PriorityHigh
+                    SupplyType.OTHER -> Icons.Default.MoreHoriz
+                }
+                Icon(
+                    icon, 
+                    contentDescription = null, 
+                    tint = if (isSelected) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+            Spacer(modifier = Modifier.width(16.dp))
+            Column {
+                Text(
+                    text = type.name.replace("_", " "),
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold
+                )
+                Text(
+                    text = getSupplyDescription(type),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+        }
+    }
+}
+
+fun getSupplyDescription(type: SupplyType): String {
+    return when (type) {
+        SupplyType.WATER -> "Drinking water or purification"
+        SupplyType.FOOD -> "Emergency rations or meals"
+        SupplyType.MEDICINE -> "First aid or chronic medication"
+        SupplyType.SHELTER -> "Tents or temporary housing"
+        SupplyType.BLANKET -> "Bedding or thermal insulation"
+        SupplyType.EVACUATION -> "Assistance leaving the area"
+        SupplyType.EMERGENCY -> "Life-threatening situation"
+        SupplyType.OTHER -> "Custom supply or assistance"
     }
 }
 
@@ -183,68 +239,88 @@ fun SupplyDetails(uiState: SupplyUiState, viewModel: SupplyViewModel) {
         modifier = Modifier
             .fillMaxSize()
             .padding(16.dp)
+            .verticalScroll(rememberScrollState())
     ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             IconButton(onClick = viewModel::previousStep, modifier = Modifier.size(32.dp)) {
                 Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
             }
             Spacer(modifier = Modifier.width(8.dp))
-            Text("Provide Details", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+            Text("Request details", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.ExtraBold)
         }
         
         Spacer(modifier = Modifier.height(24.dp))
         
-        Text("Quantity Units", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+        Text("QUANTITY", style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
         Spacer(modifier = Modifier.height(8.dp))
         Row(
             verticalAlignment = Alignment.CenterVertically,
-            modifier = Modifier.background(MaterialTheme.colorScheme.surfaceVariant, RoundedCornerShape(12.dp)).padding(8.dp)
+            modifier = Modifier
+                .fillMaxWidth()
+                .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f), RoundedCornerShape(16.dp))
+                .padding(8.dp)
         ) {
-            IconButton(onClick = { viewModel.updateQuantity(uiState.quantity - 1) }) {
-                Icon(Icons.Default.Close, contentDescription = "Decrease") 
-            } // Using Close/Clear instead of standard minus if missing
+            IconButton(
+                onClick = { viewModel.updateQuantity(uiState.quantity - 1) },
+                colors = IconButtonDefaults.iconButtonColors(containerColor = MaterialTheme.colorScheme.surface)
+            ) {
+                Icon(Icons.Default.Remove, contentDescription = "Decrease") 
+            }
             Text(
                 "${uiState.quantity}",
                 modifier = Modifier.weight(1f),
                 textAlign = TextAlign.Center,
-                style = MaterialTheme.typography.titleLarge,
-                fontWeight = FontWeight.Bold
+                style = MaterialTheme.typography.headlineSmall,
+                fontWeight = FontWeight.Black
             )
-            IconButton(onClick = { viewModel.updateQuantity(uiState.quantity + 1) }) {
+            IconButton(
+                onClick = { viewModel.updateQuantity(uiState.quantity + 1) },
+                colors = IconButtonDefaults.iconButtonColors(containerColor = MaterialTheme.colorScheme.surface)
+            ) {
                 Icon(Icons.Default.Add, contentDescription = "Increase")
             }
         }
 
         Spacer(modifier = Modifier.height(24.dp))
 
+        Text("LOCATION", style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
+        Spacer(modifier = Modifier.height(8.dp))
         OutlinedTextField(
             value = uiState.location,
             onValueChange = viewModel::updateLocation,
-            label = { Text("Exact Location *") },
-            placeholder = { Text("e.g. Sector 4, Building B") },
+            placeholder = { Text("Where should it be delivered?") },
             modifier = Modifier.fillMaxWidth(),
-            singleLine = true
+            shape = RoundedCornerShape(16.dp),
+            singleLine = true,
+            leadingIcon = { Icon(Icons.Default.LocationOn, contentDescription = null, tint = MaterialTheme.colorScheme.primary) }
         )
 
-        Spacer(modifier = Modifier.height(16.dp))
+        Spacer(modifier = Modifier.height(24.dp))
 
+        val notesLabel = if (uiState.selectedType == SupplyType.OTHER) "DESCRIBE YOUR NEED *" else "ADDITIONAL NOTES (OPTIONAL)"
+        Text(notesLabel, style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
+        Spacer(modifier = Modifier.height(8.dp))
         OutlinedTextField(
             value = uiState.notes,
             onValueChange = viewModel::updateNotes,
-            label = { Text("Additional Notes (Optional)") },
+            placeholder = { Text(if (uiState.selectedType == SupplyType.OTHER) "Specify what you need exactly..." else "Any details that help rescue teams") },
             modifier = Modifier.fillMaxWidth(),
-            minLines = 3
+            shape = RoundedCornerShape(16.dp),
+            minLines = 4,
+            maxLines = 6
         )
 
-        Spacer(modifier = Modifier.weight(1f))
+        Spacer(modifier = Modifier.height(32.dp))
 
+        val isEnabled = uiState.location.isNotBlank() && (uiState.selectedType != SupplyType.OTHER || uiState.notes.isNotBlank())
+        
         Button(
             onClick = viewModel::nextStep,
             modifier = Modifier.fillMaxWidth().height(56.dp),
-            enabled = uiState.location.isNotBlank(),
-            shape = RoundedCornerShape(12.dp)
+            enabled = isEnabled,
+            shape = RoundedCornerShape(16.dp)
         ) {
-            Text("REVIEW REQUEST")
+            Text("REVIEW REQUEST", fontWeight = FontWeight.Bold)
         }
         Spacer(modifier = Modifier.height(16.dp))
     }
@@ -262,38 +338,48 @@ fun SupplyReview(uiState: SupplyUiState, viewModel: SupplyViewModel) {
                 Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
             }
             Spacer(modifier = Modifier.width(8.dp))
-            Text("Review Request", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+            Text("Review request", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.ExtraBold)
         }
         
         Spacer(modifier = Modifier.height(24.dp))
 
         CrisisCard(modifier = Modifier.fillMaxWidth()) {
-            Column(modifier = Modifier.padding(16.dp)) {
-                Text("SUMMARY", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                Spacer(modifier = Modifier.height(12.dp))
+            Column(modifier = Modifier.padding(20.dp)) {
+                Text("ORDER SUMMARY", style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Black, color = MaterialTheme.colorScheme.primary)
+                Spacer(modifier = Modifier.height(16.dp))
                 
-                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                    Text("Type", style = MaterialTheme.typography.bodyMedium)
-                    Text("${uiState.selectedType?.name}", fontWeight = FontWeight.Bold)
-                }
-                HorizontalDivider(modifier = Modifier.padding(vertical = 12.dp), color = MaterialTheme.colorScheme.outlineVariant)
-                
-                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                    Text("Quantity", style = MaterialTheme.typography.bodyMedium)
-                    Text("${uiState.quantity} Units", fontWeight = FontWeight.Bold)
-                }
-                HorizontalDivider(modifier = Modifier.padding(vertical = 12.dp), color = MaterialTheme.colorScheme.outlineVariant)
-                
-                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                    Text("Location", style = MaterialTheme.typography.bodyMedium)
-                    Text("${uiState.location}", fontWeight = FontWeight.Bold)
-                }
+                ReviewRow(label = "Supply Category", value = uiState.selectedType?.name?.replace("_", " ") ?: "")
+                ReviewRow(label = "Requested Quantity", value = "${uiState.quantity} Unit(s)")
+                ReviewRow(label = "Delivery Location", value = uiState.location)
                 
                 if (uiState.notes.isNotBlank()) {
-                    HorizontalDivider(modifier = Modifier.padding(vertical = 12.dp), color = MaterialTheme.colorScheme.outlineVariant)
-                    Text("Notes", style = MaterialTheme.typography.bodyMedium)
-                    Text("${uiState.notes}", fontWeight = FontWeight.SemiBold, modifier = Modifier.padding(top = 4.dp))
+                    Spacer(modifier = Modifier.height(16.dp))
+                    Text("ADDITIONAL NOTES", style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Black, color = MaterialTheme.colorScheme.primary)
+                    Text(
+                        text = uiState.notes,
+                        style = MaterialTheme.typography.bodyMedium,
+                        modifier = Modifier.padding(top = 8.dp),
+                        color = MaterialTheme.colorScheme.onSurface
+                    )
                 }
+            }
+        }
+
+        Spacer(modifier = Modifier.height(24.dp))
+        
+        Surface(
+            color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f),
+            shape = RoundedCornerShape(12.dp),
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Row(modifier = Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
+                Icon(Icons.Default.Info, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(20.dp))
+                Spacer(Modifier.width(12.dp))
+                Text(
+                    "This request will be stored in your outbox and sent to any rescue node that comes into range.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
             }
         }
 
@@ -302,13 +388,29 @@ fun SupplyReview(uiState: SupplyUiState, viewModel: SupplyViewModel) {
         Button(
             onClick = { viewModel.submitRequest() },
             modifier = Modifier.fillMaxWidth().height(56.dp),
-            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFFF9800)),
-            shape = RoundedCornerShape(12.dp)
+            colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary),
+            shape = RoundedCornerShape(16.dp)
         ) {
-            Text("SUBMIT TO MESH", fontWeight = FontWeight.Bold, color = Color.White)
+            Icon(Icons.AutoMirrored.Filled.Send, contentDescription = null, modifier = Modifier.size(18.dp))
+            Spacer(Modifier.width(8.dp))
+            Text("BROADCAST REQUEST", fontWeight = FontWeight.Bold)
         }
         Spacer(modifier = Modifier.height(16.dp))
     }
+}
+
+@Composable
+fun ReviewRow(label: String, value: String) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = 8.dp),
+        horizontalArrangement = Arrangement.SpaceBetween
+    ) {
+        Text(text = label, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Text(text = value, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Bold, textAlign = TextAlign.End, modifier = Modifier.weight(1f).padding(start = 16.dp))
+    }
+    HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
 }
 
 @Composable
@@ -316,24 +418,22 @@ fun SupplyBroadcast(onComplete: () -> Unit) {
     val infiniteTransition = rememberInfiniteTransition(label = "pulse")
     val radius by infiniteTransition.animateFloat(
         initialValue = 0f,
-        targetValue = 300f,
+        targetValue = 400f,
         animationSpec = infiniteRepeatable(
-            animation = tween(2000, easing = LinearOutSlowInEasing),
+            animation = tween(2500, easing = LinearOutSlowInEasing),
             repeatMode = RepeatMode.Restart
         ),
         label = "pulseRadius"
     )
     val alpha by infiniteTransition.animateFloat(
-        initialValue = 1f,
+        initialValue = 0.8f,
         targetValue = 0f,
         animationSpec = infiniteRepeatable(
-            animation = tween(2000, easing = LinearOutSlowInEasing),
+            animation = tween(2500, easing = LinearOutSlowInEasing),
             repeatMode = RepeatMode.Restart
         ),
         label = "pulseAlpha"
     )
-
-    val color = Color(0xFFFF9800)
 
     Column(
         modifier = Modifier.fillMaxSize(),
@@ -346,27 +446,37 @@ fun SupplyBroadcast(onComplete: () -> Unit) {
         ) {
             Canvas(modifier = Modifier.fillMaxSize()) {
                 drawCircle(
-                    color = color.copy(alpha = alpha),
+                    color = Color(0xFFFF9800).copy(alpha = alpha),
                     radius = radius
                 )
                 drawCircle(
-                    color = color,
-                    radius = 40.dp.toPx()
+                    color = Color(0xFFFF9800),
+                    radius = 50.dp.toPx()
                 )
             }
-            Icon(Icons.AutoMirrored.Filled.Send, contentDescription = "Broadcast", tint = Color.White, modifier = Modifier.size(32.dp))
+            Icon(Icons.AutoMirrored.Filled.Send, contentDescription = "Broadcast", tint = Color.White, modifier = Modifier.size(36.dp))
         }
-        
-        Spacer(modifier = Modifier.height(32.dp))
-        
-        Text("Searching for NGO nodes...", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
-        Spacer(modifier = Modifier.height(8.dp))
-        Text("Request propagating through mesh network DTN.\nWill be delivered in up to 72 hours.", textAlign = TextAlign.Center, color = MaterialTheme.colorScheme.onSurfaceVariant)
         
         Spacer(modifier = Modifier.height(48.dp))
         
-        OutlinedButton(onClick = onComplete) {
-            Text("VIEW MY REQUESTS")
+        Text("Request active", style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Black)
+        Spacer(modifier = Modifier.height(12.dp))
+        Text(
+            text = "Your request is propagating through the mesh network using Delay Tolerant Networking (DTN).",
+            textAlign = TextAlign.Center,
+            modifier = Modifier.padding(horizontal = 32.dp),
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+        
+        Spacer(modifier = Modifier.height(64.dp))
+        
+        Button(
+            onClick = onComplete,
+            modifier = Modifier.padding(horizontal = 32.dp).fillMaxWidth().height(56.dp),
+            shape = RoundedCornerShape(16.dp)
+        ) {
+            Text("DONE", fontWeight = FontWeight.Bold)
         }
     }
 }
@@ -375,63 +485,133 @@ fun SupplyBroadcast(onComplete: () -> Unit) {
 fun MyRequestsTab(activeRequests: List<SupplyRequest>, onCancel: (String) -> Unit) {
     if (activeRequests.isEmpty()) {
         EmptyState(
-            icon = Icons.Default.ListAlt,
+            icon = Icons.Default.Inventory,
             title = "No active requests",
-            subtitle = "Create a request above to get help",
+            subtitle = "You haven't requested any supplies yet. Tap 'New Request' to begin.",
             modifier = Modifier.fillMaxSize().padding(16.dp)
         )
     } else {
         LazyColumn(
-            modifier = Modifier.fillMaxSize().padding(16.dp),
+            modifier = Modifier.fillMaxSize(),
+            contentPadding = PaddingValues(16.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
             items(activeRequests, key = { it.id }) { request ->
-            val statusColor = when (request.status) {
-                RequestStatus.QUEUED, RequestStatus.CANCELLED -> Color.Gray       
-                RequestStatus.BROADCASTING -> Color(0xFFFF9800)
-                RequestStatus.NGO_RECEIVED -> Color(0xFF2196F3)
-                RequestStatus.CONFIRMED, RequestStatus.DELIVERED -> Color(0xFF4CAF50)
-                RequestStatus.EXPIRED -> Color(0xFFF44336)
+                SupplyRequestCard(request = request, onCancel = { onCancel(request.id) })
             }
+        }
+    }
+}
+
+@Composable
+fun SupplyRequestCard(request: SupplyRequest, onCancel: () -> Unit) {
+    val statusColor = when (request.status) {
+        RequestStatus.QUEUED -> Color.Gray
+        RequestStatus.BROADCASTING -> Color(0xFFFF9800)
+        RequestStatus.NGO_RECEIVED -> Color(0xFF2196F3)
+        RequestStatus.CONFIRMED -> Color(0xFF4CAF50)
+        RequestStatus.DELIVERED -> Color(0xFF4CAF50)
+        RequestStatus.EXPIRED -> MaterialTheme.colorScheme.error
+        RequestStatus.CANCELLED -> Color.Gray
+    }
+
+    CrisisCard(modifier = Modifier.fillMaxWidth()) {
+        Column(modifier = Modifier.padding(16.dp)) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Box(
+                    modifier = Modifier
+                        .size(10.dp)
+                        .clip(CircleShape)
+                        .background(statusColor)
+                )
+                Spacer(modifier = Modifier.width(8.dp))
+                Text(
+                    text = request.status.name,
+                    style = MaterialTheme.typography.labelLarge,
+                    fontWeight = FontWeight.Bold,
+                    color = statusColor
+                )
+                Spacer(modifier = Modifier.weight(1f))
+                Text(
+                    text = java.text.SimpleDateFormat("MMM dd, HH:mm", java.util.Locale.getDefault()).format(java.util.Date(request.createdAt)),
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+
+            Spacer(modifier = Modifier.height(16.dp))
             
-            CrisisCard(modifier = Modifier.fillMaxWidth()) {
-                Column(modifier = Modifier.padding(16.dp)) {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Box(modifier = Modifier.size(8.dp).clip(CircleShape).background(statusColor))
-                            Spacer(modifier = Modifier.width(8.dp))
-                            Text(request.status.name, style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.Bold, color = statusColor)
-                        }
-                        
-                        if (request.status in listOf(RequestStatus.QUEUED, RequestStatus.BROADCASTING)) {
-                            TextButton(onClick = { onCancel(request.id) }, contentPadding = PaddingValues(0.dp), modifier = Modifier.height(24.dp)) {
-                                Text("CANCEL", color = MaterialTheme.colorScheme.error)
-                            }
-                        }
-                    }
-                    
-                    Spacer(modifier = Modifier.height(12.dp))
-                    
+            Text(
+                text = "${request.quantity}x ${request.requestType.name.replace("_", " ")}",
+                style = MaterialTheme.typography.titleLarge,
+                fontWeight = FontWeight.ExtraBold
+            )
+            
+            Row(
+                modifier = Modifier.padding(top = 4.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Icon(Icons.Default.LocationOn, contentDescription = null, modifier = Modifier.size(14.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                Spacer(Modifier.width(4.dp))
+                Text(
+                    text = request.location,
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+
+            if (request.notes.isNotBlank()) {
+                Spacer(modifier = Modifier.height(12.dp))
+                Surface(
+                    color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+                    shape = RoundedCornerShape(8.dp),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
                     Text(
-                        "${request.quantity}x ${request.requestType.name}",
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.Bold
+                        text = request.notes,
+                        style = MaterialTheme.typography.bodySmall,
+                        modifier = Modifier.padding(8.dp),
+                        color = MaterialTheme.colorScheme.onSurface
                     )
-                    Text("Location: ${request.location}", style = MaterialTheme.typography.bodyMedium)
-                    
-                    if (request.assignedNgo != null) {
-                        Spacer(modifier = Modifier.height(8.dp))
-                        Text("Assigned to: ${request.assignedNgo}", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.primary)
-                    }
-                    if (request.estimatedDelivery != null && request.status != RequestStatus.DELIVERED) {
-                        Text("ETA: ${request.estimatedDelivery}", style = MaterialTheme.typography.bodySmall, fontWeight = FontWeight.Bold)
+                }
+            }
+
+            if (request.assignedNgo != null) {
+                Spacer(modifier = Modifier.height(16.dp))
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.1f), RoundedCornerShape(8.dp))
+                        .padding(12.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Icon(Icons.Default.Business, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(20.dp))
+                    Spacer(Modifier.width(12.dp))
+                    Column {
+                        Text(text = "NGO Assigned", style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold)
+                        Text(text = request.assignedNgo, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
+                        if (request.estimatedDelivery != null) {
+                            Text(text = "ETA: ${request.estimatedDelivery}", style = MaterialTheme.typography.bodySmall)
+                        }
                     }
                 }
             }
+
+            if (request.status in listOf(RequestStatus.QUEUED, RequestStatus.BROADCASTING)) {
+                Spacer(modifier = Modifier.height(16.dp))
+                OutlinedButton(
+                    onClick = onCancel,
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(8.dp),
+                    colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.error)
+                ) {
+                    Text("CANCEL REQUEST")
+                }
+            }
         }
-    }}}
+    }
+}
 

@@ -9,12 +9,14 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.Chat
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.filled.PushPin
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
@@ -33,6 +35,7 @@ import com.elv8.crisisos.domain.model.chat.ChatThread
 import com.elv8.crisisos.ui.components.CrisisCard
 import com.elv8.crisisos.ui.components.CrisisTopBar
 import com.elv8.crisisos.ui.components.InputField
+import com.elv8.crisisos.ui.components.LocalTopBarState
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -43,42 +46,20 @@ fun ChatListScreen(
     viewModel: ChatListViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsState()
+    val topBarState = LocalTopBarState.current
 
-    Scaffold(
-        floatingActionButton = {
-            FloatingActionButton(
-                onClick = onNavigateToDiscover,
-                containerColor = Color(0xFFFF9800), // Orange
-                contentColor = Color.White
-            ) {
-                Icon(Icons.Default.Edit, contentDescription = "New Chat")        
-            }
-        }
-    ) { padding ->
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(padding)
-                .background(MaterialTheme.colorScheme.background)
-        ) {
+    LaunchedEffect(Unit) {
+        topBarState.update(
+            title = { Text("MESSAGES", fontWeight = FontWeight.Bold) }
+        )
+    }
 
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 16.dp, vertical = 4.dp),
-                horizontalArrangement = Arrangement.End,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                TextButton(onClick = onNavigateToRequests) {
-                    Text(
-                        text = if (uiState.pendingRequestCount > 0) "Requests (${uiState.pendingRequestCount})" else "Requests",
-                        style = MaterialTheme.typography.labelLarge,
-                        fontWeight = if (uiState.pendingRequestCount > 0) FontWeight.Bold else FontWeight.Normal,
-                        color = if (uiState.pendingRequestCount > 0) Color(0xFFFF9800) else MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                }
-            }
-
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(MaterialTheme.colorScheme.background)
+    ) {
+        Column(modifier = Modifier.fillMaxSize()) {
             if (uiState.filteredThreads.isEmpty()) {
                 Box(
                     modifier = Modifier.fillMaxSize(),
@@ -172,6 +153,17 @@ fun ChatListScreen(
                     }
                 }
             }
+        }
+        
+        FloatingActionButton(
+            onClick = onNavigateToDiscover,
+            containerColor = Color(0xFFFF9800),
+            contentColor = Color.White,
+            modifier = Modifier
+                .align(Alignment.BottomEnd)
+                .padding(16.dp)
+        ) {
+            Icon(Icons.AutoMirrored.Filled.Chat, contentDescription = "New Chat")
         }
     }
 }

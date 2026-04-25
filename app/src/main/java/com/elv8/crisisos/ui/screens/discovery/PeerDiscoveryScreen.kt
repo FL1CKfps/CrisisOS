@@ -1,7 +1,6 @@
 package com.elv8.crisisos.ui.screens.discovery
 
 import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.core.InfiniteTransition
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.animateFloat
@@ -19,30 +18,23 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.GroupAdd
-import androidx.compose.material.icons.filled.PersonAdd
-import androidx.compose.material.icons.filled.PersonSearch
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.WifiFind
 import androidx.compose.material.icons.filled.ArrowBack
+import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.*
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.DisposableEffect
-import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.setValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
+import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -52,16 +44,36 @@ import com.elv8.crisisos.ui.components.CrisisCard
 import com.elv8.crisisos.ui.components.InputField
 import com.elv8.crisisos.ui.components.StatusBadge
 import com.elv8.crisisos.ui.components.BadgeStatus
+import com.elv8.crisisos.ui.components.LocalTopBarState
+import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun PeerDiscoveryScreen(
-    onNavigateToConnectionRequest: (peerCrsId: String) -> Unit,
+    onNavigateToChat: (threadId: String) -> Unit,
     onNavigateBack: () -> Unit,
     viewModel: PeerDiscoveryViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+    val scope = rememberCoroutineScope()
+    val topBarState = LocalTopBarState.current
     var sheetTemporarilyDismissed by remember { mutableStateOf(false) }
+
+    LaunchedEffect(Unit) {
+        topBarState.update(
+            title = { Text("NEARBY PEERS", fontWeight = FontWeight.Bold) },
+            navigationIcon = {
+                IconButton(onClick = onNavigateBack) {
+                    Icon(Icons.Default.ArrowBack, contentDescription = "Back")
+                }
+            },
+            actions = {
+                if (uiState.isDiscovering) {
+                    com.elv8.crisisos.ui.screens.discovery.AnimatedScanningDots()
+                }
+            }
+        )
+    }
 
     if (!uiState.hasSeenOnboarding && !sheetTemporarilyDismissed) {
         DiscoveryOnboardingSheet(
@@ -82,18 +94,19 @@ fun PeerDiscoveryScreen(
         }
     }
 
-    Scaffold(
-        topBar = { }
-    ) { paddingValues ->
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(MaterialTheme.colorScheme.background)
+    ) {
         LazyColumn(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(paddingValues)
                 .padding(horizontal = 16.dp),
-            contentPadding = PaddingValues(vertical = 16.dp),
+            contentPadding = PaddingValues(bottom = 16.dp, top = 0.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
-            // Item 1 � Local identity header card
+            // Item 1 Local identity header card
             item {
                 uiState.localIdentity?.let { identity ->
                     CrisisCard(modifier = Modifier.fillMaxWidth()) {
@@ -128,7 +141,7 @@ fun PeerDiscoveryScreen(
                 }
             }
 
-            // Item 2 � Scanning header row
+            // Item 2  Scanning header row
             item {
                 Row(
                     modifier = Modifier.fillMaxWidth(),
@@ -154,7 +167,7 @@ fun PeerDiscoveryScreen(
                 }
             }
 
-            // Item 3 � Search + Sort row
+            // Item 3  Search + Sort row
             item {
                 Column(modifier = Modifier.fillMaxWidth()) {
                     InputField(
@@ -173,7 +186,7 @@ fun PeerDiscoveryScreen(
                             .horizontalScroll(rememberScrollState()),
                         horizontalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
-                        PeerSortOrder.values().forEach { order ->
+                        PeerSortOrder.entries.forEach { order ->
                             val isSelected = uiState.sortOrder == order
                             FilterChip(
                                 selected = isSelected,
@@ -196,7 +209,7 @@ fun PeerDiscoveryScreen(
                         horizontalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
                         FilterChip(
-                            selected = uiState.filterStatus == null && !uiState.filterRequested,
+                            selected = uiState.filterStatus == null,
                             onClick = { viewModel.setStatusFilter(null) },
                             label = { Text("All") }
                         )
@@ -210,16 +223,11 @@ fun PeerDiscoveryScreen(
                             onClick = { viewModel.setStatusFilter(PeerStatus.BUSY) },
                             label = { Text("Busy") }
                         )
-                        FilterChip(
-                            selected = uiState.filterRequested,
-                            onClick = { viewModel.setRequestedFilter() },
-                            label = { Text("Requested") }
-                        )
                     }
                 }
             }
 
-            // Item 4..N � PeerListItems or Empty States
+            // Item 4..N PeerListItems or Empty States
             if (uiState.filteredPeers.isEmpty()) {
                 item {
                     if (uiState.isDiscovering) {
@@ -243,7 +251,7 @@ fun PeerDiscoveryScreen(
                 }
             } else {
                 itemsIndexed(uiState.filteredPeers, key = { _, peer -> peer.crsId }) { index, peer ->
-                    var isVisible by androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf(false) }
+                    var isVisible by remember { mutableStateOf(false) }
                     LaunchedEffect(peer.crsId) { isVisible = true }
                     
                     AnimatedVisibility(
@@ -253,8 +261,12 @@ fun PeerDiscoveryScreen(
                     ) {
                         PeerListItem(
                             peer = peer,
-                            hasExistingRequest = viewModel.hasAlreadySentRequest(peer.crsId),
-                            onConnect = { onNavigateToConnectionRequest(peer.crsId) }
+                            onChat = { 
+                                scope.launch {
+                                    val threadId = viewModel.startChat(peer)
+                                    onNavigateToChat(threadId)
+                                }
+                            }
                         )
                     }
                 }
@@ -262,7 +274,7 @@ fun PeerDiscoveryScreen(
 
             if (com.elv8.crisisos.BuildConfig.DEBUG) {
                 item {
-                    val diagnosticsViewModel: DiagnosticsViewModel = androidx.hilt.navigation.compose.hiltViewModel()
+                    val diagnosticsViewModel: DiagnosticsViewModel = hiltViewModel()
                     val snapshot by diagnosticsViewModel.snapshot.collectAsStateWithLifecycle()
                     DiagnosticsPanel(snapshot = snapshot)
                 }
@@ -274,13 +286,12 @@ fun PeerDiscoveryScreen(
 @Composable
 private fun PeerListItem(
     peer: Peer,
-    hasExistingRequest: Boolean,
-    onConnect: () -> Unit
+    onChat: () -> Unit
 ) {
     CrisisCard(
         modifier = Modifier
             .fillMaxWidth()
-            .clickable(enabled = !hasExistingRequest, onClick = onConnect)
+            .clickable(onClick = onChat)
     ) {
         Row(
             modifier = Modifier
@@ -333,16 +344,14 @@ private fun PeerListItem(
                 }
             }
             
-            if (hasExistingRequest) {
-                StatusBadge(text = "Requested", status = BadgeStatus.ACTIVE)
-            } else {
-                IconButton(onClick = onConnect) {
-                    Icon(
-                        imageVector = Icons.Default.PersonAdd,
-                        contentDescription = "Connect",
-                        tint = Color(0xFFFF9800)
-                    )
-                }
+            Button(
+                onClick = onChat,
+                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFFF9800)),
+                contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp),
+                modifier = Modifier.height(36.dp),
+                shape = RoundedCornerShape(8.dp)
+            ) {
+                Text("Chat", style = MaterialTheme.typography.labelLarge)
             }
         }
     }
@@ -428,5 +437,3 @@ private fun ScanningRing() {
         )
     }
 }
-
-

@@ -15,12 +15,14 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
+import java.util.UUID
 import javax.inject.Inject
 
 @HiltViewModel
 class OnboardingViewModel @Inject constructor(
     @ApplicationContext private val context: Context,
-    private val database: CrisisDatabase
+    private val database: CrisisDatabase,
+    private val identityRepository: com.elv8.crisisos.domain.repository.IdentityRepository
 ) : ViewModel() {
 
     private val dataStore = context.settingsDataStore
@@ -29,7 +31,6 @@ class OnboardingViewModel @Inject constructor(
     val onboarded = _onboarded.asStateFlow()
 
     private object PreferencesKeys {
-        val ALIAS = stringPreferencesKey("alias")
         val HAS_SEEN_ONBOARDING = booleanPreferencesKey("has_seen_onboarding")
     }
 
@@ -43,14 +44,18 @@ class OnboardingViewModel @Inject constructor(
         }
     }
 
-    fun completeOnboarding(alias: String) {
+    fun completeOnboarding(firstName: String, surname: String, dob: String) {
         viewModelScope.launch {
-            MockDataSeeder.seed(database, alias)
+            val deviceId = android.provider.Settings.Secure.getString(
+                context.contentResolver, 
+                android.provider.Settings.Secure.ANDROID_ID
+            ) ?: UUID.randomUUID().toString()
+            
+            val identity = identityRepository.getOrCreateIdentity(deviceId, firstName, surname, dob)
+            
+            MockDataSeeder.seed(database, identity.alias)
             
             dataStore.edit { preferences ->
-                if (alias.isNotBlank()) {
-                    preferences[PreferencesKeys.ALIAS] = alias
-                }
                 preferences[PreferencesKeys.HAS_SEEN_ONBOARDING] = true
             }
         }

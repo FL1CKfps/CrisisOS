@@ -50,6 +50,8 @@ import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -62,12 +64,25 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 
+import com.elv8.crisisos.ui.components.LocalTopBarState
+
 @Composable
 fun SosScreen(
     onNavigateBack: () -> Unit,
     viewModel: SosViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+    val topBarState = LocalTopBarState.current
+
+    LaunchedEffect(Unit) {
+        topBarState.isVisible = false
+    }
+
+    DisposableEffect(Unit) {
+        onDispose {
+            topBarState.isVisible = true
+        }
+    }
 
     val infiniteTransition = rememberInfiniteTransition(label = "sosPulse")
     val pulseAlpha by infiniteTransition.animateFloat(

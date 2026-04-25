@@ -30,6 +30,7 @@ import com.elv8.crisisos.domain.model.DeconflictionReport
 import com.elv8.crisisos.domain.model.ProtectionStatus
 import com.elv8.crisisos.domain.model.ReportType
 import com.elv8.crisisos.ui.components.CrisisCard
+import com.elv8.crisisos.ui.components.LocalTopBarState
 import kotlinx.coroutines.delay
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -39,101 +40,98 @@ fun DeconflictionScreen(
     viewModel: DeconflictionViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+    val topBarState = LocalTopBarState.current
 
-    Scaffold(
-        topBar = {
-            TopAppBar(
-                title = { 
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Icon(Icons.Default.AddBox, contentDescription = null, tint = Color(0xFFF44336), modifier = Modifier.size(24.dp))
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Column {
-                            Text("DECONFLICTION SYSTEM", fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleMedium)
-                            Text("Geneva Convention Protection Reports", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                        }
-                    }
-                },
-                navigationIcon = {
-                    IconButton(onClick = onNavigateBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
-                    }
-                },
-                colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.background)
-            )
-        },
-        containerColor = MaterialTheme.colorScheme.background
-    ) { paddingValues ->
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(paddingValues)
-        ) {
-            LazyColumn(
-                modifier = Modifier
-                    .weight(1f)
-                    .fillMaxWidth()
-                    .padding(horizontal = 16.dp),
-                verticalArrangement = Arrangement.spacedBy(24.dp)
-            ) {
-                // Stepper Header
-                item {
-                    Spacer(modifier = Modifier.height(8.dp))
-                    StepperHeader(
-                        currentStep = uiState.currentStep,
-                        onStepClick = { step -> 
-                            if (step < uiState.currentStep) {
-                                if (step == 1) viewModel.resetDraft() else viewModel.previousStep()
-                            }
-                        }
-                    )
-                }
-
-                // Step Content
-                item {
-                    AnimatedContent(
-                        targetState = uiState.currentStep,
-                        label = "step_content"
-                    ) { step ->
-                        when(step) {
-                            1 -> StepOneTypeSelection(
-                                selectedType = uiState.draftType,
-                                onSelect = viewModel::updateDraftType,
-                                onNext = viewModel::nextStep
-                            )
-                            2 -> StepTwoDetails(
-                                facilityName = uiState.draftFacilityName,
-                                onNameChange = viewModel::updateFacilityName,
-                                coordinates = uiState.draftCoordinates,
-                                onCoordsChange = viewModel::updateCoordinates,
-                                onUseGps = viewModel::useCurrentLocation,
-                                status = uiState.draftStatus,
-                                onStatusChange = viewModel::updateProtectionStatus,
-                                onNext = viewModel::nextStep,
-                                onBack = viewModel::previousStep
-                            )
-                            3 -> StepThreeGenerate(
-                                state = uiState,
-                                onGenerate = viewModel::generateReport,
-                                onReset = viewModel::resetDraft,
-                                onBack = viewModel::previousStep
-                            )
-                        }
+    LaunchedEffect(Unit) {
+        topBarState.update(
+            title = {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(Icons.Default.AddBox, contentDescription = null, tint = Color(0xFFF44336), modifier = Modifier.size(24.dp))
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Column {
+                        Text("DECONFLICTION", fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleMedium)
+                        Text("Protection Reports", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
                 }
-
-                // Divider before list
-                item {
-                    HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp), color = MaterialTheme.colorScheme.outlineVariant)
-                    Text("ACTIVE BROADCASTS", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
+            },
+            navigationIcon = {
+                IconButton(onClick = onNavigateBack) {
+                    Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
                 }
-
-                // Past Reports List
-                items(uiState.reports, key = { it.id }) { report ->
-                    ReportCard(report = report)
-                }
-                
-                item { Spacer(modifier = Modifier.height(40.dp)) }
             }
+        )
+    }
+
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(MaterialTheme.colorScheme.background)
+    ) {
+        LazyColumn(
+            modifier = Modifier
+                .weight(1f)
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp),
+            verticalArrangement = Arrangement.spacedBy(24.dp)
+        ) {
+            // Stepper Header
+            item {
+                Spacer(modifier = Modifier.height(8.dp))
+                StepperHeader(
+                    currentStep = uiState.currentStep,
+                    onStepClick = { step -> 
+                        if (step < uiState.currentStep) {
+                            if (step == 1) viewModel.resetDraft() else viewModel.previousStep()
+                        }
+                    }
+                )
+            }
+
+            // Step Content
+            item {
+                AnimatedContent(
+                    targetState = uiState.currentStep,
+                    label = "step_content"
+                ) { step ->
+                    when(step) {
+                        1 -> StepOneTypeSelection(
+                            selectedType = uiState.draftType,
+                            onSelect = viewModel::updateDraftType,
+                            onNext = viewModel::nextStep
+                        )
+                        2 -> StepTwoDetails(
+                            facilityName = uiState.draftFacilityName,
+                            onNameChange = viewModel::updateFacilityName,
+                            coordinates = uiState.draftCoordinates,
+                            onCoordsChange = viewModel::updateCoordinates,
+                            onUseGps = viewModel::useCurrentLocation,
+                            status = uiState.draftStatus,
+                            onStatusChange = viewModel::updateProtectionStatus,
+                            onNext = viewModel::nextStep,
+                            onBack = viewModel::previousStep
+                        )
+                        3 -> StepThreeGenerate(
+                            state = uiState,
+                            onGenerate = viewModel::generateReport,
+                            onReset = viewModel::resetDraft,
+                            onBack = viewModel::previousStep
+                        )
+                    }
+                }
+            }
+
+            // Divider before list
+            item {
+                HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp), color = MaterialTheme.colorScheme.outlineVariant)
+                Text("ACTIVE BROADCASTS", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
+            }
+
+            // Past Reports List
+            items(uiState.reports, key = { it.id }) { report ->
+                ReportCard(report = report)
+            }
+            
+            item { Spacer(modifier = Modifier.height(40.dp)) }
         }
     }
 }
@@ -206,7 +204,7 @@ fun StepOneTypeSelection(
     onNext: () -> Unit
 ) {
     Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-        ReportType.values().forEach { type ->
+        ReportType.entries.forEach { type ->
             val isSelected = selectedType == type
             CrisisCard(
                 modifier = Modifier
@@ -294,7 +292,7 @@ fun StepTwoDetails(
         Text("CURRENT STATUS", style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
         
         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            ProtectionStatus.values().forEach { stat ->
+            ProtectionStatus.entries.forEach { stat ->
                 val isSelected = status == stat
                 val (color, _) = getStatusInfo(stat)
                 

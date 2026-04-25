@@ -10,7 +10,9 @@ sealed class Screen(val route: String) {
     data object Sos : Screen("sos")
     data object DeadManSwitch : Screen("dead_man_switch")
     data object MissingPerson : Screen("missing_person")
-    data object Supply : Screen("supply")
+    data class Supply(val category: String? = null, val notes: String? = null) : Screen("supply?category={category}&notes={notes}") {
+        fun createRoute(cat: String? = null, note: String? = null) = "supply?category=$cat&notes=$note"
+    }
     data object Maps : Screen("maps")
     data object DangerZone : Screen("danger_zone")
     data object Checkpoint : Screen("checkpoint")
@@ -18,6 +20,8 @@ sealed class Screen(val route: String) {
     data object FakeNews : Screen("fake_news")
     data object Deconfliction : Screen("deconfliction")
     data object ChildAlert : Screen("child_alert")
+    data object CrisisNews : Screen("crisis_news")
+    data object CommunityBoard : Screen("community_board")
     data object More : Screen("more")
     data object Settings : Screen("settings")
     data object Onboarding : Screen("onboarding")

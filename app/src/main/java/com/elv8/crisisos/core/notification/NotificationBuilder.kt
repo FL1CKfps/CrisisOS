@@ -14,6 +14,7 @@ import com.elv8.crisisos.core.notification.event.channelId
 import com.elv8.crisisos.core.notification.event.groupKey
 import com.elv8.crisisos.core.notification.event.priority
 import dagger.hilt.android.qualifiers.ApplicationContext
+import androidx.core.net.toUri
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -176,7 +177,7 @@ class NotificationBuilder @Inject constructor(
         val locationLine = if (event.locationHint != null) "\nLocation: ${event.locationHint}" else ""
         val bodyText = "${event.sosType.replace('_', ' ')} — ${event.message}$locationLine\nVia ${event.hopsAway} mesh hop(s)"
 
-        return wrapper.buildBaseBuilder(event.channelId(), event.priority())
+        val builder = wrapper.buildBaseBuilder(event.channelId(), event.priority())
             .setContentTitle("SOS ALERT — ${event.fromAlias}")
             .setContentText("${event.sosType} emergency nearby")
             .setStyle(NotificationCompat.BigTextStyle().bigText(bodyText))
@@ -185,7 +186,18 @@ class NotificationBuilder @Inject constructor(
             .setCategory(NotificationCompat.CATEGORY_ALARM)
             .setOngoing(false)
             .setFullScreenIntent(tapIntent, true)  // heads-up notification
-            .build()
+
+        if (event.latitude != null && event.longitude != null) {
+            val geoUri = "geo:${event.latitude},${event.longitude}?q=${event.latitude},${event.longitude}(${event.fromAlias} SOS)"
+            val mapIntent = Intent(Intent.ACTION_VIEW, geoUri.toUri())
+            val mapPendingIntent = PendingIntent.getActivity(
+                context, event.alertId.hashCode(), mapIntent,
+                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+            )
+            builder.addAction(android.R.drawable.ic_menu_directions, "Navigate", mapPendingIntent)
+        }
+
+        return builder.build()
     }
 
     // --- SUPPLY UPDATE notifications ---

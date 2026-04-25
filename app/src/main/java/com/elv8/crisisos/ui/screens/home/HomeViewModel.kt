@@ -41,7 +41,9 @@ class HomeViewModel @Inject constructor(
     private val identityRepository: com.elv8.crisisos.domain.repository.IdentityRepository,
     private val notificationSettings: NotificationSettings,
     private val notifWrapper: NotificationManagerWrapper,
-    private val notificationEventBus: NotificationEventBus
+    private val notificationEventBus: NotificationEventBus,
+    private val meshManager: com.elv8.crisisos.core.network.mesh.IMeshConnectionManager,
+    private val peerRepository: com.elv8.crisisos.domain.repository.PeerRepository
 ) : ViewModel() {
     private val _uiState = MutableStateFlow(HomeUiState())
     val uiState: StateFlow<HomeUiState> = _uiState.asStateFlow()
@@ -50,20 +52,25 @@ class HomeViewModel @Inject constructor(
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
             val hasPermission = notifWrapper.hasNotificationPermission()
             _uiState.update { it.copy(needsNotificationPermission = !hasPermission) }
-            if (!hasPermission) {
-                Log.w("CrisisOS_Home", "POST_NOTIFICATIONS permission not granted")
+        }
+
+        viewModelScope.launch {
+            meshManager.isDiscovering.collect { discovering ->
+                _uiState.update { 
+                    it.copy(meshStatus = if (discovering) MeshStatus.SCANNING else if (meshManager.connectedPeers.value.isNotEmpty()) MeshStatus.CONNECTED else MeshStatus.OFFLINE)
+                }
             }
         }
 
         viewModelScope.launch {
-            // Fake initial scanning state, then connect after 3 seconds        
-            delay(3000)
-            _uiState.update {
-                it.copy(
-                    meshStatus = MeshStatus.CONNECTED,
-                    peersNearby = 3,
-                    lastSyncTime = "Just now"
-                )
+            meshManager.connectedPeers.collect { peers ->
+                _uiState.update { 
+                    it.copy(
+                        peersNearby = peers.size,
+                        meshStatus = if (peers.isNotEmpty()) MeshStatus.CONNECTED else if (meshManager.isDiscovering.value) MeshStatus.SCANNING else MeshStatus.OFFLINE,
+                        lastSyncTime = if (peers.isNotEmpty()) "Just now" else it.lastSyncTime
+                    )
+                }
             }
         }
     }

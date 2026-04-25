@@ -8,7 +8,7 @@ plugins {
 
 android {
     namespace = "com.elv8.crisisos"
-    compileSdk = 35
+    compileSdk = 37
 
     defaultConfig {
         applicationId = "com.elv8.crisisos"
@@ -113,6 +113,13 @@ dependencies {
 
     // Preferences — required for OSMDroid config persistence
     implementation("androidx.preference:preference-ktx:1.2.1")
+
+    // LiteRT-LM (on-device Gemma runtime)
+    implementation("com.google.ai.edge.litertlm:litertlm-android:0.10.2")
+
+    // Markdown rendering
+    implementation("com.mikepenz:multiplatform-markdown-renderer-m3:0.40.2")
+    implementation("com.mikepenz:multiplatform-markdown-renderer:0.40.2")
 
     // Testing
     testImplementation(libs.junit)

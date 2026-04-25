@@ -3,7 +3,6 @@ package com.elv8.crisisos.ui.screens.chat
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.elv8.crisisos.domain.model.chat.ChatThread
-import com.elv8.crisisos.domain.repository.ConnectionRequestRepository
 import com.elv8.crisisos.domain.repository.ThreadChatRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -26,9 +25,7 @@ data class ChatListUiState(
 
 @HiltViewModel
 class ChatListViewModel @Inject constructor(
-    private val messageRequestRepository: com.elv8.crisisos.domain.repository.MessageRequestRepository,
     private val threadChatRepository: ThreadChatRepository,
-    private val connectionRequestRepository: ConnectionRequestRepository,
     private val notificationHandler: NotificationHandler
 ) : ViewModel() {
 
@@ -36,10 +33,8 @@ class ChatListViewModel @Inject constructor(
 
     val uiState: StateFlow<ChatListUiState> = combine(
         threadChatRepository.getAllThreads(),
-        connectionRequestRepository.getIncomingRequests(),
-        messageRequestRepository.getPendingRequests(),
         _searchQuery
-    ) { threads, requests, messages, query ->
+    ) { threads, query ->
         val filtered = threads.filter { thread ->
             if (query.isNotBlank() && !thread.displayName.contains(query, ignoreCase = true)) return@filter false
             if (!com.elv8.crisisos.core.debug.MeshDebugConfig.ENABLE_MOCK_PEER_INJECTION && thread.isMock) return@filter false
@@ -47,7 +42,7 @@ class ChatListViewModel @Inject constructor(
         }
         ChatListUiState(
             threads = threads,
-            pendingRequestCount = requests.size + messages.size,
+            pendingRequestCount = 0,
             searchQuery = query,
             filteredThreads = filtered
         )
@@ -59,17 +54,8 @@ class ChatListViewModel @Inject constructor(
 
     init {
         viewModelScope.launch {
-            // Small delay to let the screen render first
             delay(500)
             notificationHandler.clearChatGroupSummary()
-            // Note: individual thread notifications are NOT cancelled — only the summary
-            android.util.Log.d("CrisisOS_ChatList", "Chat group summary cleared on list open")
-        }
-    }
-
-    fun markThreadsAsRead(threadIds: List<String>) {
-        threadIds.forEach { threadId ->
-            notificationHandler.clearNotificationsForThread(threadId)
         }
     }
 
@@ -89,4 +75,3 @@ class ChatListViewModel @Inject constructor(
         }
     }
 }
-

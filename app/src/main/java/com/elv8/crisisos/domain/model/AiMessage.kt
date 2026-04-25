@@ -11,5 +11,11 @@ data class AiMessage(
     val role: AiRole,
     val content: String,
     val timestamp: Long = System.currentTimeMillis(),
-    val isStreaming: Boolean = false
+    val isStreaming: Boolean = false,
+    val actions: List<AiAction> = emptyList()
+)
+
+data class AiAction(
+    val feature: String,
+    val params: Map<String, String> = emptyMap()
 )

@@ -4,20 +4,17 @@ import android.graphics.Color
 import kotlin.random.Random
 
 object CrsIdGenerator {
-    private val CHAR_POOL = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789".toList()
 
-    fun generate(): String {
-        fun randomSegment(length: Int): String {
-            return (1..length)
-                .map { Random.nextInt(0, CHAR_POOL.size) }
-                .map(CHAR_POOL::get)
-                .joinToString("")
-        }
-        return "CRS-" + randomSegment(4) + "-" + randomSegment(4)
+    fun generate(firstName: String, surname: String, dob: String): String {
+        val f = firstName.take(2).uppercase().padEnd(2, 'X')
+        val s = surname.take(2).uppercase().padEnd(2, 'X')
+        // dob is expected to be DDMMYYYY
+        return "$f$s-$dob"
     }
 
     fun isValid(crsId: String): Boolean {
-        val regex = Regex("^CRS-[A-HJ-NP-Z2-9]{4}-[A-HJ-NP-Z2-9]{4}\$")
+        // Updated regex to match [A-Z]{4}-[0-9]{8}
+        val regex = Regex("^[A-Z]{4}-[0-9]{8}\$")
         return regex.matches(crsId)
     }
 

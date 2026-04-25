@@ -17,10 +17,7 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.elv8.crisisos.domain.model.contact.TrustLevel
-import com.elv8.crisisos.ui.components.CrisisCard
-import com.elv8.crisisos.ui.components.CrsAvatar
-import com.elv8.crisisos.ui.components.StatusBadge
-import com.elv8.crisisos.ui.components.BadgeStatus
+import com.elv8.crisisos.ui.components.*
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -34,24 +31,25 @@ fun PeerProfileScreen(
 ) {
     LaunchedEffect(crsId) { viewModel.loadProfile(crsId, threadId, isFromChat) }
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+    val topBarState = LocalTopBarState.current
 
-    Scaffold(
-        topBar = {
-            TopAppBar(
-                title = { Text(uiState.profile?.alias ?: "Profile") },
-                navigationIcon = {
-                    IconButton(onClick = onNavigateBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
-                    }
+    LaunchedEffect(uiState.profile) {
+        topBarState.update(
+            title = { Text(uiState.profile?.alias ?: "PROFILE", fontWeight = FontWeight.Bold) },
+            navigationIcon = {
+                IconButton(onClick = onNavigateBack) {
+                    Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
                 }
-            )
-        }
-    ) { padding ->
-        LazyColumn(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(padding)
-        ) {
+            }
+        )
+    }
+
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(MaterialTheme.colorScheme.background)
+    ) {
+        LazyColumn(modifier = Modifier.fillMaxSize()) {
             item {
                 Column(
                     horizontalAlignment = Alignment.CenterHorizontally,
@@ -180,12 +178,12 @@ fun PeerProfileScreen(
                 Spacer(modifier = Modifier.height(80.dp))
             }
         }
-    }
 
-    LaunchedEffect(uiState.selectedMediaItem) {
-        uiState.selectedMediaItem?.let { item ->
-            item.mediaId?.let { onNavigateToFullscreenMedia(it) }
-            viewModel.clearSelectedMedia()
+        LaunchedEffect(uiState.selectedMediaItem) {
+            uiState.selectedMediaItem?.let { item ->
+                onNavigateToFullscreenMedia(item.mediaId)
+                viewModel.clearSelectedMedia()
+            }
         }
     }
 }

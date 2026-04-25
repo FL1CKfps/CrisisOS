@@ -70,11 +70,19 @@ class MeshMessenger @Inject constructor(
 ) : IMeshMessenger  {
 
     override suspend fun sendChatMessage(message: ChatMessage): DomainSendResult {
-        val chatPayload = ChatPayload(content = message.content, messageId = message.id)
+        val targetId = message.targetId
+        val content = if (targetId != null) {
+            com.elv8.crisisos.core.network.mesh.MeshEncryption.encrypt(message.content, targetId)
+        } else {
+            message.content
+        }
+        
+        val chatPayload = ChatPayload(content = content, messageId = message.id)
         val packet = PacketFactory.buildChatPacket(
             senderId = message.senderId,
             senderAlias = message.senderAlias,
-            payload = chatPayload
+            payload = chatPayload,
+            targetId = targetId
         )
 
         return when (send(packet)) {
@@ -122,6 +130,28 @@ class MeshMessenger @Inject constructor(
                 val packet = MeshPacket(
                     packetId = java.util.UUID.randomUUID().toString(),
                     type = MeshPacketType.CONNECTION_REQUEST,
+                    senderId = connectionManager.getLocalCrsId(),
+                    senderAlias = connectionManager.getLocalAlias(),
+                    payload = json,
+                    timestamp = System.currentTimeMillis(),
+                    priority = PacketPriority.HIGH,
+                    targetId = event.toCrsId
+                )
+                send(packet)
+            }
+        }
+        eventBus.observe(scope, com.elv8.crisisos.core.event.AppEvent.ConnectionEvent.SendOutboundResponse::class) { event ->
+            scope.launch {
+                val payload = com.elv8.crisisos.data.dto.payloads.ConnectionResponsePayload(
+                    requestId = event.requestId,
+                    accepted = event.accepted,
+                    fromAlias = event.fromAlias,
+                    fromAvatarColor = event.fromAvatarColor
+                )
+                val json = MeshJson.encodeToString(com.elv8.crisisos.data.dto.payloads.ConnectionResponsePayload.serializer(), payload)
+                val packet = MeshPacket(
+                    packetId = java.util.UUID.randomUUID().toString(),
+                    type = MeshPacketType.CONNECTION_RESPONSE,
                     senderId = connectionManager.getLocalCrsId(),
                     senderAlias = connectionManager.getLocalAlias(),
                     payload = json,
@@ -326,11 +356,85 @@ class MeshMessenger @Inject constructor(
                     ))
                 }
             }
+            MeshPacketType.CONNECTION_RESPONSE -> {
+                val payload = decodePayload(packet, com.elv8.crisisos.data.dto.payloads.ConnectionResponsePayload.serializer())
+                if (payload != null) {
+                    log("Received ConnectionResponse from: ${payload.fromAlias} (accepted=${payload.accepted})")
+                    eventBus.emit(AppEvent.ConnectionEvent.ResponseReceived(
+                        requestId = payload.requestId,
+                        fromCrsId = packet.senderId,
+                        fromAlias = payload.fromAlias,
+                        fromAvatarColor = payload.fromAvatarColor,
+                        accepted = payload.accepted
+                    ))
+                }
+            }
             MeshPacketType.CHAT_MESSAGE -> {
                 val payload = decodePayload(packet, ChatPayload.serializer())
                 if (payload != null) {
                     log("Received ChatMessage: ${payload.content}")
-                    eventBus.emit(AppEvent.MeshEvent.MessageReceived(packet, incomingEndpointId))
+                    
+                    scope.launch(Dispatchers.IO) {
+                        val threadId = resolveThreadIdFromPacket(packet)
+                        val myId = connectionManager.getLocalCrsId()
+                        val decryptedContent = com.elv8.crisisos.core.network.mesh.MeshEncryption.decrypt(payload.content, myId)
+                        
+                        val existing = chatThreadDao.getById(threadId)
+                        if (existing == null) {
+                            chatThreadDao.insert(
+                                com.elv8.crisisos.data.local.entity.ChatThreadEntity(
+                                    threadId = threadId,
+                                    type = "DIRECT",
+                                    peerCrsId = packet.senderId,
+                                    displayName = packet.senderAlias,
+                                    avatarColor = com.elv8.crisisos.domain.model.identity.CrsIdGenerator.generateAvatarColor(packet.senderId),
+                                    lastMessagePreview = decryptedContent,
+                                    lastMessageAt = packet.timestamp,
+                                    createdAt = packet.timestamp,
+                                    unreadCount = 1,
+                                    isPinned = false,
+                                    isMuted = false,
+                                    isMock = false,
+                                    groupId = null,
+                                    connectionRequestId = null
+                                )
+                            )
+                        }
+                        
+                        chatDao.insertMessage(com.elv8.crisisos.data.local.entity.ChatMessageEntity(
+                            id = payload.messageId,
+                            threadId = threadId,
+                            fromCrsId = packet.senderId,
+                            fromAlias = packet.senderAlias,
+                            content = decryptedContent,
+                            timestamp = packet.timestamp,
+                            deliveryStatus = com.elv8.crisisos.domain.model.MessageStatus.DELIVERED,
+                            isOwn = false,
+                            messageType = com.elv8.crisisos.domain.model.MessageType.TEXT,
+                            hopsCount = packet.hopCount,
+                            senderId = packet.senderId,
+                            senderAlias = packet.senderAlias
+                        ))
+                        
+                        chatThreadDao.updateLastMessage(threadId, decryptedContent, packet.timestamp)
+                        chatThreadDao.incrementUnread(threadId)
+                        
+                        eventBus.emit(AppEvent.MeshEvent.MessageReceived(packet, incomingEndpointId))
+                        
+                        notificationBus.emitChat(
+                            com.elv8.crisisos.core.notification.event.NotificationEvent.Chat.MessageReceived(
+                                threadId = threadId,
+                                fromCrsId = packet.senderId,
+                                fromAlias = packet.senderAlias,
+                                avatarColor = com.elv8.crisisos.domain.model.identity.CrsIdGenerator.generateAvatarColor(packet.senderId),
+                                messagePreview = decryptedContent,
+                                messageId = payload.messageId,
+                                timestamp = packet.timestamp,
+                                isGroupChat = false,
+                                groupName = null
+                            )
+                        )
+                    }
                 }
             }
             MeshPacketType.SOS_ALERT -> {
@@ -342,11 +446,13 @@ class MeshMessenger @Inject constructor(
                             com.elv8.crisisos.core.notification.event.NotificationEvent.Sos.IncomingAlert(
                                 alertId = packet.packetId,
                                 fromCrsId = packet.senderId,
-                                fromAlias = packet.senderAlias,
+                                fromAlias = payload.senderName ?: packet.senderAlias,
                                 sosType = payload.sosType,
                                 message = payload.message,
                                 locationHint = payload.locationHint,
-                                hopsAway = packet.hopCount
+                                hopsAway = packet.hopCount,
+                                latitude = payload.latitude,
+                                longitude = payload.longitude
                             )
                         )
                         MeshLogger.connection("SOS notification event emitted from ${packet.senderAlias}")

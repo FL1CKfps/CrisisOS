@@ -18,6 +18,7 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.filterIsInstance
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
@@ -54,6 +55,7 @@ class SosViewModel @Inject constructor(
     private val messenger: MeshMessenger,
     private val eventBus: EventBus,
     private val locationRepository: LocationRepository,
+    private val identityRepository: com.elv8.crisisos.domain.repository.IdentityRepository,
     private val notificationBus: com.elv8.crisisos.core.notification.NotificationEventBus,
     private val notificationHandler: com.elv8.crisisos.core.notification.NotificationHandler,
     @ApplicationContext private val context: Context
@@ -128,15 +130,20 @@ class SosViewModel @Inject constructor(
             val locationHint = loc?.toHumanReadable()
 
             val currentState = _uiState.value
+            val senderName = identityRepository.getIdentity().first()?.alias ?: getAlias(context)
+            
             val payload = SosPayload(
                 sosType = currentState.sosType?.name ?: SosType.GENERAL.name,
                 message = currentState.messageText,
-                locationHint = locationHint
+                locationHint = locationHint,
+                latitude = loc?.latitude,
+                longitude = loc?.longitude,
+                senderName = senderName
             )
 
             val packet = PacketFactory.buildSosPacket(
-                senderId = getDeviceId(context),
-                senderAlias = getAlias(context),
+                senderId = identityRepository.getIdentity().first()?.crsId ?: getDeviceId(context),
+                senderAlias = senderName,
                 payload = payload,
                 locationHint = locationHint
             )

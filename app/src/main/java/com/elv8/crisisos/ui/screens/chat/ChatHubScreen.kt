@@ -18,18 +18,21 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import com.elv8.crisisos.ui.screens.discovery.PeerDiscoveryScreen
 import com.elv8.crisisos.ui.screens.requests.MessageRequestsScreen
 import com.elv8.crisisos.ui.components.InputField
+import com.elv8.crisisos.ui.components.LocalTopBarState
 
 @Composable
 fun ChatHubScreen(
     onNavigateToThread: (threadId: String) -> Unit,
-    onNavigateToRequest: () -> Unit,
-    onNavigateToConnectionRequest: (crsId: String) -> Unit,
     viewModel: ChatHubViewModel = hiltViewModel(),
     listViewModel: ChatListViewModel = hiltViewModel()
 ) {
-    val totalRequestCount by viewModel.totalRequestCount.collectAsState()        
     val activeTab by viewModel.activeTab.collectAsState()
     val listUiState by listViewModel.uiState.collectAsState()
+    val topBarState = LocalTopBarState.current
+
+    LaunchedEffect(Unit) {
+        topBarState.update(title = { Text("MESSAGES", fontWeight = FontWeight.Bold) })
+    }
 
     val pagerState = rememberPagerState(pageCount = { 2 })
 
@@ -49,14 +52,14 @@ fun ChatHubScreen(
             text = "Messages",
             style = MaterialTheme.typography.headlineMedium,
             fontWeight = FontWeight.Bold,
-            modifier = Modifier.padding(start = 16.dp, top = 16.dp, end = 16.dp, bottom = 8.dp)
+            modifier = Modifier.padding(start = 16.dp, top = 0.dp, end = 16.dp, bottom = 8.dp)
         )
 
         Box(modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)) {
             InputField(
                 value = listUiState.searchQuery,
                 onValueChange = listViewModel::updateSearch,
-                label = "Search...",
+                label = "Search peers...",
                 modifier = Modifier.fillMaxWidth()
             )
         }
@@ -72,14 +75,14 @@ fun ChatHubScreen(
             ) {
                 Row(modifier = Modifier.fillMaxSize()) {
                     TabItem(
-                        title = "Chats",
+                        title = "Active Chats",
                         isSelected = activeTab == 0,
                         count = 0,
                         onClick = { viewModel.setTab(0) },
                         modifier = Modifier.weight(1f)
                     )
                     TabItem(
-                        title = "Discover",
+                        title = "Nearby Peers",
                         isSelected = activeTab == 1,
                         count = 0,
                         onClick = { viewModel.setTab(1) },
@@ -119,15 +122,14 @@ fun ChatHubScreen(
                 0 -> {
                     ChatListScreen(
                         onNavigateToThread = onNavigateToThread,
-                        onNavigateToRequests = onNavigateToRequest,
+                        onNavigateToRequests = {},
                         onNavigateToDiscover = { viewModel.setTab(1) }
                     )
                 }
                 1 -> {
                     PeerDiscoveryScreen(
                         onNavigateBack = { viewModel.setTab(0) },
-                        
-                        onNavigateToConnectionRequest = onNavigateToConnectionRequest
+                        onNavigateToChat = onNavigateToThread
                     )
                 }
             }

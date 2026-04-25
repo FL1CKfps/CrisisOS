@@ -75,6 +75,58 @@ class ConnectionRequestRepositoryImpl @Inject constructor(
                 Log.d("CrisisOS_ConnRepo", "ConnectionRequestReceived emitted fromCrsId=${entity.fromCrsId}")
             }
         }
+
+        eventBus.observe(scope, com.elv8.crisisos.core.event.AppEvent.ConnectionEvent.ResponseReceived::class) { event ->
+            if (event.accepted) {
+                scope.launch {
+                    val now = System.currentTimeMillis()
+                    connectionRequestDao.updateStatus(event.requestId, "ACCEPTED", now)
+
+                    contactDao.insertContact(
+                        ContactEntity(
+                            crsId = event.fromCrsId,
+                            alias = event.fromAlias,
+                            addedAt = now,
+                            groupId = null,
+                            trustLevel = "BASIC",
+                            notes = "",
+                            avatarColor = event.fromAvatarColor,
+                            isFavorite = false,
+                            isBlocked = false
+                        )
+                    )
+
+                    val threadId = UUID.randomUUID().toString()
+                    chatThreadDao.insert(
+                        ChatThreadEntity(
+                            threadId = threadId,
+                            type = "DIRECT",
+                            peerCrsId = event.fromCrsId,
+                            groupId = null,
+                            displayName = event.fromAlias,
+                            avatarColor = event.fromAvatarColor,
+                            lastMessagePreview = "Request accepted",
+                            lastMessageAt = now,
+                            unreadCount = 0,
+                            isPinned = false,
+                            isMuted = false,
+                            isMock = false,
+                            createdAt = now,
+                            connectionRequestId = event.requestId
+                        )
+                    )
+                    
+                    notificationBus.emitRequest(
+                        NotificationEvent.Request.ConnectionRequestAccepted(
+                            requestId = event.requestId,
+                            byAlias = event.fromAlias,
+                            byCrsId = event.fromCrsId,
+                            newThreadId = threadId
+                        )
+                    )
+                }
+            }
+        }
     }
 
     override fun getIncomingRequests(): Flow<List<ConnectionRequest>> {
@@ -139,6 +191,8 @@ override suspend fun sendRequest(toPeer: Peer, message: String): SendRequestResu
         )
 
         val threadId = UUID.randomUUID().toString()
+        val localIdentity = identityRepository.getIdentity().firstOrNull()
+        
         chatThreadDao.insert(
             ChatThreadEntity(
                 threadId = threadId,
@@ -159,6 +213,14 @@ override suspend fun sendRequest(toPeer: Peer, message: String): SendRequestResu
         )
 
         scope.launch {
+            eventBus.emit(com.elv8.crisisos.core.event.AppEvent.ConnectionEvent.SendOutboundResponse(
+                requestId = requestId,
+                toCrsId = request.fromCrsId,
+                accepted = true,
+                fromAlias = localIdentity?.alias ?: "Unknown",
+                fromAvatarColor = localIdentity?.avatarColor ?: 0
+            ))
+
             notificationBus.emitRequest(
                 NotificationEvent.Request.ConnectionRequestAccepted(
                     requestId = requestId,

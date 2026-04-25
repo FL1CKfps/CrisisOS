@@ -53,8 +53,9 @@ sealed class AppEvent {
 
     sealed class ConnectionEvent : AppEvent() {
         data class SendOutboundRequest(val requestId: String, val toCrsId: String, val message: String, val fromAvatarColor: Int, val fromAlias: String) : ConnectionEvent()
+        data class SendOutboundResponse(val requestId: String, val toCrsId: String, val accepted: Boolean, val fromAlias: String, val fromAvatarColor: Int) : ConnectionEvent()
         data class RequestReceived(val requestId: String, val fromCrsId: String, val fromAlias: String, val fromAvatarColor: Int, val message: String, val timestamp: Long) : ConnectionEvent()
-        data class ResponseReceived(val requestId: String, val accepted: Boolean) : ConnectionEvent()
+        data class ResponseReceived(val requestId: String, val fromCrsId: String, val fromAlias: String, val fromAvatarColor: Int, val accepted: Boolean) : ConnectionEvent()
     }
 
     sealed class SystemEvent : AppEvent() {
