@@ -9,7 +9,8 @@ object MapConfiguration {
     // Default map center — New Delhi, India (update to match deployment region)
     const val DEFAULT_LATITUDE = 28.6139
     const val DEFAULT_LONGITUDE = 77.2090
-    const val DEFAULT_ZOOM = 14.0
+    const val DEFAULT_ZOOM = 15.0          // street-level — close enough to see nearby pins
+    const val LOCATE_ME_ZOOM = 16.5        // tighter zoom when user taps "locate me"
 
     const val MIN_ZOOM = 5.0
     const val MAX_ZOOM = 19.0
@@ -22,4 +23,7 @@ object MapConfiguration {
 
     // Cache folder name inside app's internal files dir
     const val TILE_CACHE_FOLDER = "osmdroid_tiles"
+
+    // ID used for the "route to nearest open safe zone" polyline
+    const val ROUTE_TO_NEAREST_ID = "ROUTE_TO_NEAREST"
 }

@@ -67,6 +67,35 @@ Alternatively, use a CI/CD system (GitHub Actions, Bitrise) with an Android SDK 
 - WorkManager handles background retries, cleanup, and Dead Man Switch monitoring
 - Kotlinx Serialization (JSON) used for packet serialization over mesh
 
+## Offline Maps (OSMDroid)
+
+Lives in `core/map/` (MapViewFactory, MapOverlayManager, MarkerFactory,
+MapConfiguration) and `ui/screens/maps/` (MapsScreen, MapsViewModel,
+CrisisMapView).
+
+OSMDroid is initialized once in `CrisisOSApp.onCreate()` with a custom user
+agent and an in-app tile cache (500 MB) so OSM doesn't block requests and
+tiles persist offline.
+
+Pin system (per CrisisOS spec):
+- **Inner fill** = type color (CAMP / HOSPITAL / WATER / FOOD / EVAC / SAFE_HOUSE)
+- **Outer ring** = status color (green=open, orange=near full, red=full/closed)
+- Status is derived from `isOperational` + occupancy ratio in
+  `SafeZone.status()` — single source of truth shared by pins, list cards, and
+  the detail sheet.
+
+Map UX:
+- Auto-centers on the user's first GPS fix at street zoom, then never auto-pans
+  again — the user is in control. A locate-me FAB animates back to their
+  position on demand.
+- Distance from user is computed via Haversine in the ViewModel; the list view
+  is sorted by raw kilometers, not by parsing display strings.
+- A polyline is drawn from the user to the **nearest open** safe zone as a
+  visual route hint (true offline routing is a roadmap item).
+- Top-left legend explains the status colors; top-right "NEAREST OPEN" badge
+  is tappable to jump to that zone; bottom-left shows offline/online state.
+- Tapping a map pin opens the same `ZoneDetailSheet` as the list view.
+
 ## On-Device AI Assistant (Gemma 4 E2B via LiteRT-LM)
 
 Lives in `core/ai/GemmaInference.kt`, `ui/screens/aiassistant/AiViewModel.kt`,
