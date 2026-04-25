@@ -23,7 +23,9 @@ enum class MeshPacketType {
     CONNECTION_RESPONSE,
     MEDIA_ANNOUNCE,
     MEDIA_CHUNK,
-    MEDIA_CHUNK_ACK
+    MEDIA_CHUNK_ACK,
+    CRISIS_NEWS,
+    COMMUNITY_POST
 }
 
 @Serializable

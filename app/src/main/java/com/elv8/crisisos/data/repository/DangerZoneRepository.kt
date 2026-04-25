@@ -100,7 +100,8 @@ class DangerZoneRepositoryImpl @Inject constructor(
     }
 
     override suspend fun purgeStaleReports() {
-        val staleTime = System.currentTimeMillis() - (24 * 60 * 60 * 1000L)
+        // Spec: a danger report ages out after 6 hours unless re-confirmed.
+        val staleTime = System.currentTimeMillis() - (6 * 60 * 60 * 1000L)
         dao.deleteOlderThan(staleTime)
     }
 

@@ -24,9 +24,14 @@ import com.elv8.crisisos.data.local.entity.*
         MessageRequestEntity::class,
         ChatThreadEntity::class,
         NotificationLogEntity::class,
-        MediaEntity::class
+        MediaEntity::class,
+        SafeZoneEntity::class,
+        DeconflictionReportEntity::class,
+        NewsItemEntity::class,
+        CommunityPostEntity::class,
+        FakeNewsCheckEntity::class
     ],
-    version = 14,
+    version = 15,
     exportSchema = false
 )
 @TypeConverters(Converters::class, CrisisTypeConverters::class)
@@ -49,6 +54,12 @@ abstract class CrisisDatabase : RoomDatabase() {
     abstract fun chatThreadDao(): com.elv8.crisisos.data.local.dao.ChatThreadDao
     abstract fun notificationLogDao(): com.elv8.crisisos.data.local.dao.NotificationLogDao
     abstract fun mediaDao(): com.elv8.crisisos.data.local.dao.MediaDao
+    abstract fun safeZoneDao(): com.elv8.crisisos.data.local.dao.SafeZoneDao
+    abstract fun deconflictionDao(): com.elv8.crisisos.data.local.dao.DeconflictionDao
+    abstract fun newsItemDao(): com.elv8.crisisos.data.local.dao.NewsItemDao
+    abstract fun communityPostDao(): com.elv8.crisisos.data.local.dao.CommunityPostDao
+    abstract fun fakeNewsCheckDao(): com.elv8.crisisos.data.local.dao.FakeNewsCheckDao
+    abstract fun childRecordDao(): com.elv8.crisisos.data.local.dao.ChildRecordDao
 }
 
 

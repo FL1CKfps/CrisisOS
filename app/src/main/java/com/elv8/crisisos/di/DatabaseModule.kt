@@ -106,6 +106,86 @@ object DatabaseModule {
         }
     }
 
+    private val MIGRATION_14_15 = object : Migration(14, 15) {
+        override fun migrate(db: SupportSQLiteDatabase) {
+            db.execSQL(
+                """
+                CREATE TABLE IF NOT EXISTS `safe_zones` (
+                    `id` TEXT NOT NULL,
+                    `name` TEXT NOT NULL,
+                    `type` TEXT NOT NULL,
+                    `latitude` REAL NOT NULL,
+                    `longitude` REAL NOT NULL,
+                    `capacity` INTEGER,
+                    `currentOccupancy` INTEGER,
+                    `isOperational` INTEGER NOT NULL,
+                    `operatedBy` TEXT NOT NULL,
+                    `lastUpdated` INTEGER NOT NULL,
+                    PRIMARY KEY(`id`)
+                )
+                """.trimIndent()
+            )
+            db.execSQL(
+                """
+                CREATE TABLE IF NOT EXISTS `deconfliction_reports` (
+                    `id` TEXT NOT NULL,
+                    `reportType` TEXT NOT NULL,
+                    `facilityName` TEXT NOT NULL,
+                    `coordinates` TEXT NOT NULL,
+                    `protectionStatus` TEXT NOT NULL,
+                    `genevaArticle` TEXT NOT NULL,
+                    `submittedAt` INTEGER NOT NULL,
+                    `broadcastHash` TEXT NOT NULL,
+                    `submittedBy` TEXT NOT NULL,
+                    PRIMARY KEY(`id`)
+                )
+                """.trimIndent()
+            )
+            db.execSQL(
+                """
+                CREATE TABLE IF NOT EXISTS `news_items` (
+                    `id` TEXT NOT NULL,
+                    `headline` TEXT NOT NULL,
+                    `body` TEXT NOT NULL,
+                    `category` TEXT NOT NULL,
+                    `sourceAlias` TEXT NOT NULL,
+                    `sourceCrsId` TEXT NOT NULL,
+                    `isOfficial` INTEGER NOT NULL,
+                    `publishedAt` INTEGER NOT NULL,
+                    `expiresAt` INTEGER NOT NULL,
+                    PRIMARY KEY(`id`)
+                )
+                """.trimIndent()
+            )
+            db.execSQL(
+                """
+                CREATE TABLE IF NOT EXISTS `community_posts` (
+                    `id` TEXT NOT NULL,
+                    `body` TEXT NOT NULL,
+                    `category` TEXT NOT NULL,
+                    `pinned` INTEGER NOT NULL,
+                    `createdAt` INTEGER NOT NULL,
+                    `expiresAt` INTEGER NOT NULL,
+                    PRIMARY KEY(`id`)
+                )
+                """.trimIndent()
+            )
+            db.execSQL(
+                """
+                CREATE TABLE IF NOT EXISTS `fake_news_checks` (
+                    `id` TEXT NOT NULL,
+                    `claimText` TEXT NOT NULL,
+                    `verdict` TEXT NOT NULL,
+                    `confidenceScore` REAL NOT NULL,
+                    `reasoning` TEXT NOT NULL,
+                    `sources` TEXT NOT NULL,
+                    `checkedAt` INTEGER NOT NULL,
+                    PRIMARY KEY(`id`)
+                )
+                """.trimIndent()
+            )
+        }
+    }
 
     @Provides
     @Singleton
@@ -116,7 +196,19 @@ object DatabaseModule {
             "crisis_database"
         )
         .setJournalMode(androidx.room.RoomDatabase.JournalMode.WRITE_AHEAD_LOGGING)
-        .addMigrations(MIGRATION_1_2, MIGRATION_7_8, MIGRATION_8_9, MIGRATION_11_12, MIGRATION_12_13)
+        .addMigrations(
+            MIGRATION_1_2,
+            MIGRATION_7_8,
+            MIGRATION_8_9,
+            MIGRATION_11_12,
+            MIGRATION_12_13,
+            MIGRATION_14_15
+        )
+        // NOTE (production-readiness): a destructive fallback remains here as
+        // a safety net for the v13→v14 gap (no migration was authored at the
+        // time v14 shipped). Removing this without first writing
+        // MIGRATION_13_14 would crash existing v13 installs on first launch.
+        // Tracked as a release blocker for the next non-hackathon build.
         .fallbackToDestructiveMigration()
         .build()
     }
@@ -195,5 +287,28 @@ object DatabaseModule {
     @Singleton
     fun provideNotificationLogDao(database: CrisisDatabase): com.elv8.crisisos.data.local.dao.NotificationLogDao = database.notificationLogDao()
 
+    @Provides
+    @Singleton
+    fun provideSafeZoneDao(database: CrisisDatabase): com.elv8.crisisos.data.local.dao.SafeZoneDao = database.safeZoneDao()
+
+    @Provides
+    @Singleton
+    fun provideDeconflictionDao(database: CrisisDatabase): com.elv8.crisisos.data.local.dao.DeconflictionDao = database.deconflictionDao()
+
+    @Provides
+    @Singleton
+    fun provideNewsItemDao(database: CrisisDatabase): com.elv8.crisisos.data.local.dao.NewsItemDao = database.newsItemDao()
+
+    @Provides
+    @Singleton
+    fun provideCommunityPostDao(database: CrisisDatabase): com.elv8.crisisos.data.local.dao.CommunityPostDao = database.communityPostDao()
+
+    @Provides
+    @Singleton
+    fun provideFakeNewsCheckDao(database: CrisisDatabase): com.elv8.crisisos.data.local.dao.FakeNewsCheckDao = database.fakeNewsCheckDao()
+
+    @Provides
+    @Singleton
+    fun provideChildRecordDao(database: CrisisDatabase): com.elv8.crisisos.data.local.dao.ChildRecordDao = database.childRecordDao()
 }
 

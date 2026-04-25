@@ -171,3 +171,78 @@ Two tabs:
 The unified design absorbs both 6A (Missing Person lookup) and 6B (Child
 Alert separation system) without duplicating UI — a child gone missing is
 just another watch entry the user is notified about.
+
+
+## CrisisNews Feed (Feature 11)
+
+Lives in `ui/screens/news/CrisisNewsScreen.kt` + `CrisisNewsViewModel.kt`.
+Real Room-backed feed (`NewsItemEntity` / `NewsItemDao`) with mesh propagation
+through `MeshPacketType.CRISIS_NEWS` + `NewsItemPayload`. Entries auto-expire
+after 24h; the cleanup is driven by the periodic `OutboxRetryWorker` calling
+`NewsRepository.purgeExpired()`.
+
+Posting is gated to NGO accounts (alias prefix `NGO_` or suffix `_OFFICIAL`
+until a dedicated NGO bit lands on `UserIdentity`). Cards are sorted with
+official posts first, then newest-first.
+
+## Community Board (Feature 12)
+
+Lives in `ui/screens/community/CommunityBoardScreen.kt` +
+`CommunityBoardViewModel.kt`. Anonymous posts only — `CommunityPostPayload`
+carries no CRS ID, the entity stores no author. NGO accounts (same alias
+heuristic as CrisisNews) can mark posts pinned. Posts auto-expire after 24h
+via the same `OutboxRetryWorker` cleanup path.
+
+## Fake News Detector (Feature 9)
+
+`core/heuristics/FakeNewsAnalyzer.kt` is a deterministic offline scorer that
+weighs caps ratio, punctuation density, panic vocabulary, absolute/totalizing
+language, urgency markers, propaganda phrasing, and source-citation absence.
+**Per spec, it never returns `VERIFIED` offline** — the strongest possible
+offline verdict is `UNVERIFIED`. Recent checks persist in
+`FakeNewsCheckEntity` and stream back into the UI through
+`FakeNewsCheckRepository.observeRecent()`. No `Math.random` / `delay` games
+remain in the viewmodel.
+
+## Removed mock seeds (in-VM)
+
+The following hardcoded sample data was removed and replaced with real
+persistence-backed flows:
+- `MapsViewModel.loadSampleZones()` → `SafeZoneRepository.seedDefaultsIfEmpty()`
+  on first run; live updates via `observe()`.
+- `DeadManViewModel` Alice/Bob defaults → escalation contacts come from
+  `ContactRepository.getFamilyContacts()` and a picker; persisted JSON in
+  prefs (`deadman_contacts_v2`).
+- `DeconflictionViewModel.loadSampleReports()` → `DeconflictionRepository`
+  + `DeconflictionDao`; mesh `observeIncoming()` on init.
+- `MissingPersonViewModel.seedWatches()` (Aanya / Ravi) → loaded from
+  `ChildRecordDao.getByGuardian(myCrsId)`; empty until the user registers
+  dependents.
+- `HomeUiState.activeSosAlerts = 2` → derived live from
+  `NotificationLogDao.getByType("SOS")` over a 30-minute window.
+- `CheckpointScreen` "Heavy document checking / 3 hrs ago" sample report
+  history → derived from `checkpoint.reportCount` + `lastUpdated` aggregates.
+
+Mocks that remain are **only** the ones that depend on a server backend we do
+not own: server-side Vercel cron for the Dead Man timer fallback, real GDELT
+cross-reference, and the bootstrap NGO directory.
+
+
+## Architect review — addressed fixes (T005)
+
+- **NGO authority enforced at the data boundary**: `NewsRepositoryImpl.publish()`
+  now derives `isOfficial` from the local identity's alias (`NGO_*` /
+  `*_OFFICIAL` heuristic) and throws `SecurityException` for non-NGO callers —
+  the caller-supplied `isOfficial` argument is intentionally ignored.
+  `CommunityBoardRepositoryImpl.setPinned()` and the `pinned=true` path of
+  `post()` enforce the same NGO check.  Both ViewModels surface the failure
+  via their existing error state.
+- **`observeIncoming()` idempotent registration**: `NewsRepositoryImpl`,
+  `CommunityBoardRepositoryImpl`, and `DeconflictionRepositoryImpl` now guard
+  the long-lived event-bus collector with an `AtomicBoolean` so that repeat
+  ViewModel inits (configuration changes, screen re-entry) cannot register
+  duplicate collectors.
+- **Destructive Room fallback retained with a note**: `DatabaseModule` keeps
+  `fallbackToDestructiveMigration()` as a safety net for the unwritten
+  v13→v14 path that already shipped to existing installs.  Comment in code
+  flags this as a release blocker for the next non-hackathon build.

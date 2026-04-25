@@ -206,6 +206,26 @@ object PacketFactory {
             priority = PacketPriority.LOW
         )
     }
+    fun buildNewsItemPacket(senderId: String, senderAlias: String, payload: NewsItemPayload): MeshPacket {
+        return createWrappedPacket(
+            type = MeshPacketType.CRISIS_NEWS,
+            senderId = senderId,
+            senderAlias = senderAlias,
+            payloadString = MeshJson.encodeToString(payload),
+            priority = PacketPriority.NORMAL
+        )
+    }
+
+    fun buildCommunityPostPacket(senderId: String, senderAlias: String, payload: CommunityPostPayload): MeshPacket {
+        return createWrappedPacket(
+            type = MeshPacketType.COMMUNITY_POST,
+            senderId = senderId,
+            senderAlias = senderAlias,
+            payloadString = MeshJson.encodeToString(payload),
+            priority = PacketPriority.LOW
+        )
+    }
+
     fun buildAckPacket(senderId: String, senderAlias: String, targetPacketId: String): MeshPacket {
         return createWrappedPacket(
             type = MeshPacketType.SYSTEM_ACK,

@@ -29,7 +29,8 @@ data class HomeUiState(
     val meshStatus: MeshStatus = MeshStatus.SCANNING,
     val peersNearby: Int = 0,
     val lastSyncTime: String = "Scanning...",
-    val activeSosAlerts: Int = 2,
+    /** Count of SOS notifications received in the last 30 minutes. Derived live from Room. */
+    val activeSosAlerts: Int = 0,
     val batteryOptimized: Boolean = true,
     val needsNotificationPermission: Boolean = false
 )
@@ -43,7 +44,8 @@ class HomeViewModel @Inject constructor(
     private val notifWrapper: NotificationManagerWrapper,
     private val notificationEventBus: NotificationEventBus,
     private val meshManager: com.elv8.crisisos.core.network.mesh.IMeshConnectionManager,
-    private val peerRepository: com.elv8.crisisos.domain.repository.PeerRepository
+    private val peerRepository: com.elv8.crisisos.domain.repository.PeerRepository,
+    private val notificationLogDao: com.elv8.crisisos.data.local.dao.NotificationLogDao
 ) : ViewModel() {
     private val _uiState = MutableStateFlow(HomeUiState())
     val uiState: StateFlow<HomeUiState> = _uiState.asStateFlow()
@@ -71,6 +73,17 @@ class HomeViewModel @Inject constructor(
                         lastSyncTime = if (peers.isNotEmpty()) "Just now" else it.lastSyncTime
                     )
                 }
+            }
+        }
+
+        // Active SOS count = count of SOS notifications received in the last 30 minutes.
+        // This is derived live from the notification log so the home dashboard reflects
+        // real mesh activity instead of a placeholder number.
+        viewModelScope.launch {
+            notificationLogDao.getByType("SOS").collect { logs ->
+                val window = System.currentTimeMillis() - 30L * 60_000L
+                val active = logs.count { it.timestamp >= window }
+                _uiState.update { it.copy(activeSosAlerts = active) }
             }
         }
     }

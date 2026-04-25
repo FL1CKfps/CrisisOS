@@ -296,16 +296,22 @@ fun CheckpointDetailSheet(
                 }
             }
 
-            // Fake Report History block
+            // Real report-aggregate footer — derived from on-device counts, no mock entries.
             item {
                 Spacer(modifier = Modifier.height(16.dp))
                 Text("RECENT REPORTS", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
                 Spacer(modifier = Modifier.height(8.dp))
-                
+                val reportCount = checkpoint.reportCount
+                val summary = if (reportCount <= 0) {
+                    "No mesh reports yet — yours will be the first."
+                } else {
+                    "$reportCount mesh report${if (reportCount == 1) "" else "s"} aggregated since last purge."
+                }
                 Column(modifier = Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                    ReportHistoryItem(time = checkpoint.lastReport, content = checkpoint.notes)
-                    ReportHistoryItem(time = "3 hrs ago", content = "Heavy document checking began.")
-                    ReportHistoryItem(time = "5 hrs ago", content = "Safe to cross, distributed water initially.")
+                    ReportHistoryItem(time = checkpoint.lastReport, content = summary)
+                    if (checkpoint.notes.isNotBlank()) {
+                        ReportHistoryItem(time = "Latest note", content = checkpoint.notes)
+                    }
                 }
             }
         }

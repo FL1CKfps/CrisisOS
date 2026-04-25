@@ -108,4 +108,33 @@ abstract class RepositoryModule {
         messageRequestRepositoryImpl: MessageRequestRepositoryImpl
     ): MessageRequestRepository
 
+    @Binds
+    @Singleton
+    abstract fun bindSafeZoneRepository(
+        safeZoneRepositoryImpl: SafeZoneRepositoryImpl
+    ): SafeZoneRepository
+
+    @Binds
+    @Singleton
+    abstract fun bindDeconflictionRepository(
+        deconflictionRepositoryImpl: DeconflictionRepositoryImpl
+    ): DeconflictionRepository
+
+    @Binds
+    @Singleton
+    abstract fun bindNewsRepository(
+        newsRepositoryImpl: NewsRepositoryImpl
+    ): NewsRepository
+
+    @Binds
+    @Singleton
+    abstract fun bindCommunityBoardRepository(
+        communityBoardRepositoryImpl: CommunityBoardRepositoryImpl
+    ): CommunityBoardRepository
+
+    @Binds
+    @Singleton
+    abstract fun bindFakeNewsCheckRepository(
+        fakeNewsCheckRepositoryImpl: FakeNewsCheckRepositoryImpl
+    ): FakeNewsCheckRepository
 }

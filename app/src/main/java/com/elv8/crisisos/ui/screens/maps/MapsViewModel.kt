@@ -5,10 +5,10 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.elv8.crisisos.domain.location.CrisisLocation
 import com.elv8.crisisos.domain.model.SafeZone
-import com.elv8.crisisos.domain.model.SafeZoneType
 import com.elv8.crisisos.domain.model.ZoneStatus
 import com.elv8.crisisos.domain.model.status
 import com.elv8.crisisos.domain.repository.LocationRepository
+import com.elv8.crisisos.domain.repository.SafeZoneRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -16,7 +16,6 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
-import java.util.UUID
 import javax.inject.Inject
 import kotlin.math.atan2
 import kotlin.math.cos
@@ -44,7 +43,8 @@ data class MapsUiState(
 
 @HiltViewModel
 class MapsViewModel @Inject constructor(
-    private val locationRepository: LocationRepository
+    private val locationRepository: LocationRepository,
+    private val safeZoneRepository: SafeZoneRepository
 ) : ViewModel() {
     private val _uiState = MutableStateFlow(MapsUiState())
     val uiState: StateFlow<MapsUiState> = _uiState.asStateFlow()
@@ -53,22 +53,33 @@ class MapsViewModel @Inject constructor(
     private var initialCenterApplied = false
 
     init {
-        loadSampleZones()
+        // First-run shard seed using the configured map default. Once NGOs broadcast
+        // real capacity over the mesh those rows replace the seed.
+        viewModelScope.launch {
+            safeZoneRepository.seedDefaultsIfEmpty(
+                centerLat = com.elv8.crisisos.core.map.MapConfiguration.DEFAULT_LATITUDE,
+                centerLon = com.elv8.crisisos.core.map.MapConfiguration.DEFAULT_LONGITUDE
+            )
+        }
 
-        // Start GPS tracking — registers the FusedLocation callback
+        // Observe persisted safe zones and recompute distance whenever either set changes.
+        viewModelScope.launch {
+            safeZoneRepository.observe().collect { zones ->
+                applyZones(zones)
+            }
+        }
+
         locationRepository.startTracking()
         Log.d("CrisisOS_Map", "Location tracking started")
 
-        // Collect live location updates
         viewModelScope.launch {
             locationRepository.getCurrentLocation().collect { location ->
                 location?.let { applyLocation(it, isFallback = false) }
             }
         }
 
-        // Fallback: try to get last known location immediately
         viewModelScope.launch {
-            delay(500) // Give tracking a moment to start
+            delay(500)
             if (_uiState.value.userLocation == null) {
                 val last = locationRepository.getLastKnownLocation()
                 if (last != null) {
@@ -86,12 +97,29 @@ class MapsViewModel @Inject constructor(
         Log.d("CrisisOS_Map", "Location tracking stopped")
     }
 
+    private fun applyZones(zones: List<SafeZone>) {
+        _uiState.update { state ->
+            val withDistance = zones.map { z ->
+                val km = state.userLocation?.let { loc ->
+                    haversineKm(loc.latitude, loc.longitude, z.coordinates.first, z.coordinates.second)
+                }
+                z.copy(
+                    distanceKm = km,
+                    distance = km?.let(::formatDistance) ?: "—"
+                )
+            }.sortedBy { it.distanceKm ?: Double.MAX_VALUE }
+            val nearest = withDistance
+                .filter { it.status() == ZoneStatus.OPEN }
+                .minByOrNull { it.distanceKm ?: Double.MAX_VALUE }
+            state.copy(safeZones = withDistance, nearestOpenZone = nearest)
+        }
+    }
+
     private fun applyLocation(loc: CrisisLocation, isFallback: Boolean) {
         val firstFix = !initialCenterApplied
         if (firstFix) initialCenterApplied = true
 
         _uiState.update { state ->
-            // Recompute distance against the new location, then sort by it.
             val refreshed = state.safeZones
                 .map { z ->
                     val km = haversineKm(loc.latitude, loc.longitude, z.coordinates.first, z.coordinates.second)
@@ -107,7 +135,6 @@ class MapsViewModel @Inject constructor(
                 userLocation = loc,
                 safeZones = refreshed,
                 nearestOpenZone = nearest,
-                // Only auto-pan the map on the very first fix; after that the user is in control.
                 mapCenter = if (firstFix) Pair(loc.latitude, loc.longitude) else state.mapCenter,
                 centerRequest = if (firstFix) state.centerRequest + 1 else state.centerRequest,
                 centerZoom = if (firstFix) com.elv8.crisisos.core.map.MapConfiguration.LOCATE_ME_ZOOM else state.centerZoom
@@ -118,89 +145,6 @@ class MapsViewModel @Inject constructor(
             "Location ${if (isFallback) "(last known)" else "(live)"}: " +
                 "${loc.latitude}, ${loc.longitude} firstFix=$firstFix"
         )
-    }
-
-    private fun loadSampleZones() {
-        // Sample zones placed in a tight ring around the default map center (New Delhi)
-        // so they're visible at the default zoom level and reachable by foot.
-        val cLat = com.elv8.crisisos.core.map.MapConfiguration.DEFAULT_LATITUDE
-        val cLon = com.elv8.crisisos.core.map.MapConfiguration.DEFAULT_LONGITUDE
-
-        val samples = listOf(
-            SafeZone(
-                id = UUID.randomUUID().toString(),
-                name = "Central Stadium Camp",
-                type = SafeZoneType.CAMP,
-                distance = "—",
-                capacity = 2500,
-                currentOccupancy = 2100,            // ~84% → near full (orange)
-                isOperational = true,
-                coordinates = Pair(cLat + 0.0090, cLon + 0.0010),  // ~1.0 km N
-                lastVerified = "2 hours ago",
-                operatedBy = "UNHCR"
-            ),
-            SafeZone(
-                id = UUID.randomUUID().toString(),
-                name = "City West Hospital",
-                type = SafeZoneType.HOSPITAL,
-                distance = "—",
-                capacity = 500,
-                currentOccupancy = 480,             // 96% → full (red)
-                isOperational = true,
-                coordinates = Pair(cLat + 0.0020, cLon - 0.0340),  // ~3.3 km W
-                lastVerified = "15 mins ago",
-                operatedBy = "MSF"
-            ),
-            SafeZone(
-                id = UUID.randomUUID().toString(),
-                name = "Plaza Water Dispenser",
-                type = SafeZoneType.WATER_POINT,
-                distance = "—",
-                capacity = null,
-                currentOccupancy = null,
-                isOperational = true,
-                coordinates = Pair(cLat - 0.0036, cLon + 0.0008),  // ~0.4 km S
-                lastVerified = "1 hour ago",
-                operatedBy = "Local Relief Org"
-            ),
-            SafeZone(
-                id = UUID.randomUUID().toString(),
-                name = "North Sector Distribution",
-                type = SafeZoneType.FOOD_DISTRIBUTION,
-                distance = "—",
-                capacity = 1000,
-                currentOccupancy = 1000,
-                isOperational = false,              // closed → red
-                coordinates = Pair(cLat + 0.0250, cLon - 0.0010),  // ~2.8 km N
-                lastVerified = "5 hours ago",
-                operatedBy = "World Central Kitchen"
-            ),
-            SafeZone(
-                id = UUID.randomUUID().toString(),
-                name = "Embassy Extraction Zone",
-                type = SafeZoneType.EVACUATION_POINT,
-                distance = "—",
-                capacity = 5000,
-                currentOccupancy = 1200,            // 24% → open (green)
-                isOperational = true,
-                coordinates = Pair(cLat + 0.0040, cLon + 0.0570),  // ~5.6 km E
-                lastVerified = "10 mins ago",
-                operatedBy = "Joint Task Force"
-            ),
-            SafeZone(
-                id = UUID.randomUUID().toString(),
-                name = "Old Quarter Safe House",
-                type = SafeZoneType.SAFE_HOUSE,
-                distance = "—",
-                capacity = 40,
-                currentOccupancy = 12,              // 30% → open (green)
-                isOperational = true,
-                coordinates = Pair(cLat - 0.0080, cLon - 0.0050),  // ~1 km SW
-                lastVerified = "30 mins ago",
-                operatedBy = "Civilian Network"
-            )
-        )
-        _uiState.update { it.copy(safeZones = samples) }
     }
 
     fun setMapMode(mode: MapMode) {
@@ -233,8 +177,6 @@ class MapsViewModel @Inject constructor(
             )
         }
     }
-
-    // --- distance helpers ---
 
     private fun haversineKm(lat1: Double, lon1: Double, lat2: Double, lon2: Double): Double {
         val r = 6371.0

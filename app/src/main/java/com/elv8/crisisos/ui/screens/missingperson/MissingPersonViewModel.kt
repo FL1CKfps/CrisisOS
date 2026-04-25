@@ -6,7 +6,9 @@ import com.elv8.crisisos.core.event.AppEvent
 import com.elv8.crisisos.core.event.EventBus
 import com.elv8.crisisos.data.dto.PacketFactory
 import com.elv8.crisisos.data.dto.payloads.MissingPersonPayload
+import com.elv8.crisisos.data.local.dao.ChildRecordDao
 import com.elv8.crisisos.data.remote.mesh.MeshMessenger
+import com.elv8.crisisos.domain.model.ChildStatus
 import com.elv8.crisisos.domain.repository.IdentityRepository
 import com.elv8.crisisos.domain.repository.MissingPersonRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -72,6 +74,7 @@ data class MissingPersonUiState(
 class MissingPersonViewModel @Inject constructor(
     private val missingPersonRepository: MissingPersonRepository,
     private val identityRepository: IdentityRepository,
+    private val childRecordDao: ChildRecordDao,
     private val messenger: MeshMessenger,
     private val eventBus: EventBus
 ) : ViewModel() {
@@ -87,11 +90,33 @@ class MissingPersonViewModel @Inject constructor(
     private var pendingSearchJob: Job? = null
 
     init {
-        // Resolve own CRS ID for query packets and seed the watch list.
+        // Resolve own CRS ID for query packets and hydrate watch list from any
+        // dependents this user has registered (real ChildRecord rows in Room).
         viewModelScope.launch {
             val identity = identityRepository.getIdentity().first()
-            _uiState.update { it.copy(myCrsId = identity?.crsId ?: "local_device") }
-            seedWatches()
+            val crsId = identity?.crsId ?: "local_device"
+            _uiState.update { it.copy(myCrsId = crsId) }
+
+            childRecordDao.getByGuardian(crsId).collect { children ->
+                children.forEach { child ->
+                    val status = runCatching { ChildStatus.valueOf(child.status) }
+                        .getOrDefault(ChildStatus.SEARCHING)
+                    addOrUpdateWatch(
+                        WatchEntry(
+                            crsId = child.crsChildId,
+                            displayName = child.childName,
+                            source = WatchSource.DEPENDENT,
+                            status = when (status) {
+                                ChildStatus.LOCATED, ChildStatus.REUNITED -> WatchStatus.LOCATED
+                                ChildStatus.SEARCHING -> WatchStatus.SEARCHING
+                            },
+                            lastLocation = child.lastKnownLocation.takeUnless { it.isBlank() },
+                            lastUpdate = formatRelative(child.registeredAt),
+                            note = "Registered dependent (auto-watched)"
+                        )
+                    )
+                }
+            }
         }
 
         // Mesh responses → fold back into the active search.
@@ -382,30 +407,13 @@ class MissingPersonViewModel @Inject constructor(
     private fun isWatched(crsId: String): Boolean =
         _uiState.value.watches.any { it.crsId.equals(crsId, ignoreCase = true) }
 
-    /** Sample dependents so the merged Child Alert surface isn't empty on first run. */
-    private fun seedWatches() {
-        if (_uiState.value.watches.isNotEmpty()) return
-        val now = System.currentTimeMillis()
-        addOrUpdateWatch(
-            WatchEntry(
-                crsId = "PRDU-220314",
-                displayName = "Aanya (daughter)",
-                source = WatchSource.DEPENDENT,
-                status = WatchStatus.SEARCHING,
-                lastLocation = "Camp Beta — last check-in 2h ago",
-                lastUpdate = "${(now - 2 * 60 * 60 * 1000) / 1000 / 60}m ago",
-                note = "Will auto-alert if she checks in without you within 2h."
-            )
-        )
-        addOrUpdateWatch(
-            WatchEntry(
-                crsId = "RVSI-080311",
-                displayName = "Ravi (son)",
-                source = WatchSource.DEPENDENT,
-                status = WatchStatus.LOCATED,
-                lastLocation = "Camp Alpha — with guardian",
-                lastUpdate = "12m ago"
-            )
-        )
+    private fun formatRelative(ts: Long): String {
+        val mins = (System.currentTimeMillis() - ts) / 60_000L
+        return when {
+            mins < 1   -> "Just now"
+            mins < 60  -> "${mins}m ago"
+            mins < 1440 -> "${mins / 60}h ago"
+            else -> "${mins / 1440}d ago"
+        }
     }
 }
