@@ -30,6 +30,8 @@ data class CrisisNewsUiState(
     val draftBody: String = "",
     val draftCategory: NewsCategory = NewsCategory.ALERT,
     val isPublishing: Boolean = false,
+    val isRefreshing: Boolean = false,
+    val lastRefreshMessage: String? = null,
     val error: String? = null
 )
 
@@ -57,6 +59,10 @@ class CrisisNewsViewModel @Inject constructor(
             }
         }
 
+        // Best-effort online ingest on first open. Failure is silent — the
+        // mesh-distributed feed is always the offline source of truth.
+        refresh()
+
         // NGO publish gate — until we add a real NGO bit on UserIdentity, the
         // alias convention "NGO_*" or "*_OFFICIAL" doubles as the NGO heuristic.
         // Verified relief organizations bootstrap their handles this way during
@@ -67,6 +73,34 @@ class CrisisNewsViewModel @Inject constructor(
             val canPublish = alias.startsWith("NGO_") || alias.endsWith("_OFFICIAL")
             _uiState.update { it.copy(canPublish = canPublish) }
         }
+    }
+
+    /**
+     * Pull live ACLED + GDELT items into the local feed. Safe to call
+     * repeatedly — the repo deduplicates by source-derived id.
+     */
+    fun refresh() {
+        if (_uiState.value.isRefreshing) return
+        _uiState.update { it.copy(isRefreshing = true, lastRefreshMessage = null, error = null) }
+        viewModelScope.launch {
+            val message = try {
+                val ingested = repository.refreshFromOnlineSources()
+                when {
+                    ingested == 0 -> "Already up to date"
+                    ingested == 1 -> "1 new update"
+                    else -> "$ingested new updates"
+                }
+            } catch (e: Exception) {
+                "Couldn't reach external sources"
+            }
+            _uiState.update {
+                it.copy(isRefreshing = false, lastRefreshMessage = message)
+            }
+        }
+    }
+
+    fun clearRefreshMessage() {
+        _uiState.update { it.copy(lastRefreshMessage = null) }
     }
 
     fun openComposer() {

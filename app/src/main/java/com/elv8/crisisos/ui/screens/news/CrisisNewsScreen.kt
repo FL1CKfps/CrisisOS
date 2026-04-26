@@ -9,6 +9,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Article
+import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.VerifiedUser
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -38,18 +39,43 @@ fun CrisisNewsScreen(
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     val topBarState = LocalTopBarState.current
 
-    LaunchedEffect(Unit) {
+    LaunchedEffect(state.isRefreshing, state.canPublish) {
         topBarState.update(
             title = { Text("CRISIS NEWS", fontWeight = FontWeight.Bold) },
             navigationIcon = {
                 IconButton(onClick = onNavigateBack) {
                     Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
                 }
+            },
+            actions = {
+                IconButton(
+                    onClick = viewModel::refresh,
+                    enabled = !state.isRefreshing
+                ) {
+                    if (state.isRefreshing) {
+                        CircularProgressIndicator(
+                            modifier = Modifier.size(20.dp),
+                            strokeWidth = 2.dp
+                        )
+                    } else {
+                        Icon(Icons.Default.Refresh, contentDescription = "Refresh")
+                    }
+                }
             }
         )
     }
 
+    val snackbarHostState = remember { SnackbarHostState() }
+    LaunchedEffect(state.lastRefreshMessage) {
+        val msg = state.lastRefreshMessage
+        if (!msg.isNullOrBlank()) {
+            snackbarHostState.showSnackbar(msg)
+            viewModel.clearRefreshMessage()
+        }
+    }
+
     Scaffold(
+        snackbarHost = { SnackbarHost(snackbarHostState) },
         floatingActionButton = {
             if (state.canPublish) {
                 ExtendedFloatingActionButton(
@@ -71,8 +97,12 @@ fun CrisisNewsScreen(
             if (state.items.isEmpty()) {
                 EmptyState(
                     icon = Icons.Default.Article,
-                    title = "No crisis news yet",
-                    subtitle = "Verified updates from NGOs and trusted nodes will appear here as they come in over the mesh."
+                    title = if (state.isRefreshing) "Loading crisis news…" else "No crisis news yet",
+                    subtitle = if (state.isRefreshing) {
+                        "Fetching ACLED and GDELT updates for your region."
+                    } else {
+                        "Verified updates from NGOs, ACLED, GDELT, and trusted nodes will appear here. Tap refresh to pull live data."
+                    }
                 )
             } else {
                 LazyColumn(

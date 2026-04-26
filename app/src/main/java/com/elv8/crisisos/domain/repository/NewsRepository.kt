@@ -13,4 +13,13 @@ interface NewsRepository {
     suspend fun publish(headline: String, body: String, category: String)
     suspend fun purgeExpired()
     fun observeIncoming()
+
+    /**
+     * Pull live conflict / humanitarian news from external authoritative
+     * sources (ACLED for the user's country, GDELT for credible global news)
+     * and persist any new items into the local Room store. Existing items are
+     * not duplicated. Safe to call on any thread; returns the number of new
+     * items ingested. Errors are swallowed and reported as 0.
+     */
+    suspend fun refreshFromOnlineSources(): Int
 }

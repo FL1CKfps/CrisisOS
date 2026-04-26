@@ -815,3 +815,70 @@ contract invited mistaken self-elevation by callers.
   or cryptographic NGO signature to fully close. Documented as a
   HIGH severity follow-up by the architect; not in scope for this
   build-stabilisation pass.
+
+---
+
+## Session 2026-04-26 (b) — Sidebar trim, FakeNews verdict upgrade, CrisisNews online ingest
+
+### 1. Sidebar entry removed
+`AppScaffold.kt` no longer lists Deconfliction in the navigation drawer.
+Backend (DAO, repository, navgraph route, MoreScreen entry) intentionally
+left intact — only the sidebar surface was the user's ask.
+
+### 2. Fake News verdict upgrade from GDELT corroboration
+`FakeNewsViewModel.analyzeClaim()` previously appended GDELT articles only
+to the `sources` list while leaving the verdict at the heuristic-only
+output. It now:
+- Filters articles through `core/util/CredibleDomains` (Reuters, AP, BBC,
+  Al Jazeera, Guardian, NPR, DW, France24, UN family, Red Cross / MSF,
+  HRW, Amnesty, etc).
+- ≥2 credible matches → `Verdict.VERIFIED` at `0.92f` confidence + the
+  reasoning is augmented with the corroborating domains.
+- exactly 1 credible match → keeps heuristic verdict, adds a "partial
+  corroboration" note.
+- 0 credible matches → leaves the offline heuristic verdict unchanged.
+GDELT failures still degrade silently to the offline verdict (per spec).
+
+### 3. CrisisNews online ingest (ACLED + GDELT)
+`NewsRepository` gained `suspend fun refreshFromOnlineSources(): Int`.
+`NewsRepositoryImpl` gets new constructor deps `LocationRepository`,
+`CrisisIntelRepository`, `GdeltApi`, `@ApplicationContext Context`. The
+refresh path:
+1. Reverse-geocodes the user's last known location to (countryName,
+   countryAlpha2) using `Geocoder` on Dispatchers.IO; falls back to a
+   global GDELT query when geocoding fails.
+2. Pulls 24h of country-scoped ACLED conflict events; converts each to
+   a `NewsItemEntity` with `sourceAlias = "ACLED"`, category mapped from
+   `eventType` (`Battle/Violence/Explosion → ALERT`, `Protest/Riot →
+   SAFETY`, `Strategic → INFRASTRUCTURE`).
+3. Pulls 12h of GDELT articles using a humanitarian / conflict query
+   (`humanitarian OR conflict OR evacuation OR ceasefire OR refugee OR
+   airstrike OR aid`), country-filtered when alpha-2 is available.
+   Articles are filtered to the same `CredibleDomains` allow-list before
+   ingest — the long-tail open web is dropped.
+4. Idempotency via `dao.exists()` keyed off stable derived ids
+   (`acled_<event_id_cnty>` / `gdelt_<url.hashCode()>`).
+
+### 3a. Trust boundary (post-review fix)
+External aggregator items (ACLED + GDELT) are persisted with
+`isOfficial = false`. The `OFFICIAL` badge stays reserved for items
+published by authenticated NGO/Camp identities — the credible-domain
+filter already prevents low-quality content from entering the feed.
+Provenance remains visible in the UI through `sourceAlias` ("ACLED" /
+domain).
+
+### 3b. Concurrency + error contract (post-review fixes)
+- `refreshFromOnlineSources()` is fully wrapped in `runCatching {}.getOrDefault(0)`
+  so the public contract on the interface ("errors swallowed, return 0")
+  holds whether the geocoder, ACLED, GDELT, or DAO throws.
+- A repo-scoped `Mutex` serializes refresh calls so concurrent invocations
+  cannot double-count `inserted` against the non-atomic
+  `dao.exists()` → `dao.insert()` sequence.
+
+### 3c. UI wiring
+`CrisisNewsViewModel` now triggers `refresh()` from `init {}` and exposes
+`refresh()` + `isRefreshing` + `lastRefreshMessage` state. `CrisisNewsScreen`
+gains a refresh `IconButton` in the top bar (spinner during refresh) and
+a snackbar that surfaces "N new updates" / "Already up to date" /
+"Couldn't reach external sources". The empty-state copy now mentions
+ACLED, GDELT, and trusted nodes.

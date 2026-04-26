@@ -3,6 +3,7 @@ package com.elv8.crisisos.ui.screens.fakenews
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.elv8.crisisos.core.heuristics.FakeNewsAnalyzer
+import com.elv8.crisisos.core.util.CredibleDomains
 import com.elv8.crisisos.data.local.entity.FakeNewsCheckEntity
 import com.elv8.crisisos.data.repository.CrisisIntelRepository
 import com.elv8.crisisos.domain.model.Verdict
@@ -68,10 +69,45 @@ class FakeNewsViewModel @Inject constructor(
             // Best-effort GDELT cross-reference (online only). Failures are
             // swallowed: the offline verdict is still authoritative per spec.
             val articles = intel.crossReferenceClaim(claim)
+            val credible = articles.filter { CredibleDomains.isCredible(it.domain) }
+
+            // Verdict upgrade from corroboration:
+            //   * 2+ credible international sources confirm the claim → VERIFIED
+            //   * exactly 1 credible source → keep heuristic verdict but note
+            //     partial corroboration in the reasoning string
+            //   * 0 credible sources → leave the offline heuristic verdict alone
+            val (mergedVerdict, mergedConfidence, extraNote) = when {
+                credible.size >= 2 -> Triple(
+                    Verdict.VERIFIED,
+                    0.92f,
+                    "Confirmed by ${credible.size} credible sources " +
+                        "(${credible.take(3).joinToString { it.domain }})."
+                )
+                credible.size == 1 -> Triple(
+                    baseResult.verdict,
+                    baseResult.confidenceScore,
+                    "Partial corroboration from ${credible.first().domain}; " +
+                        "needs a second independent source."
+                )
+                else -> Triple(baseResult.verdict, baseResult.confidenceScore, "")
+            }
+
             val mergedSources = if (articles.isNotEmpty()) {
                 baseResult.sources + articles.take(3).map { "GDELT: ${it.domain}" }
-            } else baseResult.sources
-            val result = baseResult.copy(sources = mergedSources)
+            } else {
+                baseResult.sources
+            }
+            val mergedReasoning = if (extraNote.isNotEmpty()) {
+                "${baseResult.reasoning} $extraNote"
+            } else {
+                baseResult.reasoning
+            }
+            val result = baseResult.copy(
+                verdict = mergedVerdict,
+                confidenceScore = mergedConfidence,
+                sources = mergedSources,
+                reasoning = mergedReasoning
+            )
 
             // Persist into Room — recentChecks list will refresh through the observe() flow.
             repository.record(result.toEntity())

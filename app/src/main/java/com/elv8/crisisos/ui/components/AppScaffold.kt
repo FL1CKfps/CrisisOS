@@ -42,7 +42,6 @@ fun AppScaffold(
         NavItem("Checkpoint Intel", Screen.Checkpoint.route, Icons.Default.Security),
         NavItem("AI Assistant", Screen.AiAssistant.route, Icons.Default.Psychology),
         NavItem("Fake News Detector", Screen.FakeNews.route, Icons.AutoMirrored.Filled.FactCheck),
-        NavItem("Deconfliction", Screen.Deconfliction.route, Icons.Default.Gavel),
         NavItem("CrisisNews Feed", Screen.CrisisNews.route, Icons.Default.Newspaper),
         NavItem("Community Board", Screen.CommunityBoard.route, Icons.Default.Groups),
     )
