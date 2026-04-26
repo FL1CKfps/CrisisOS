@@ -170,7 +170,7 @@ class ThreadChatRepositoryImpl @Inject constructor(
                 isMuted = false,
                 isMock = false,
                 groupId = null,
-                connectionRequestId = null
+                connectionRequestId = ""
             )
         )
         return@withContext threadId
@@ -190,7 +190,7 @@ class ThreadChatRepositoryImpl @Inject constructor(
         isMuted = isMuted,
         isMock = isMock,
         createdAt = createdAt,
-        connectionRequestId = connectionRequestId
+        connectionRequestId = connectionRequestId.takeIf { it.isNotBlank() }
     )
 
     private fun ChatMessageEntity.toDomain() = Message(

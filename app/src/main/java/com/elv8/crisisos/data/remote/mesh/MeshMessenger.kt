@@ -396,7 +396,7 @@ class MeshMessenger @Inject constructor(
                                     isMuted = false,
                                     isMock = false,
                                     groupId = null,
-                                    connectionRequestId = null
+                                    connectionRequestId = ""
                                 )
                             )
                         }

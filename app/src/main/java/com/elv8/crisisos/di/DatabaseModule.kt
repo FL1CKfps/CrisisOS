@@ -122,6 +122,55 @@ object DatabaseModule {
     }
 
     /**
+     * Normalize chat thread request linkage so older installs that created
+     * nullable `connectionRequestId` values don't crash when opening/creating
+     * direct message threads.
+     */
+    private val MIGRATION_17_18 = object : Migration(17, 18) {
+        override fun migrate(db: SupportSQLiteDatabase) {
+            db.execSQL(
+                """
+                CREATE TABLE IF NOT EXISTS `chat_threads_new` (
+                    `threadId` TEXT NOT NULL,
+                    `type` TEXT NOT NULL,
+                    `peerCrsId` TEXT,
+                    `groupId` TEXT,
+                    `displayName` TEXT NOT NULL,
+                    `avatarColor` INTEGER NOT NULL,
+                    `lastMessagePreview` TEXT NOT NULL,
+                    `lastMessageAt` INTEGER NOT NULL,
+                    `unreadCount` INTEGER NOT NULL,
+                    `isPinned` INTEGER NOT NULL,
+                    `isMuted` INTEGER NOT NULL,
+                    `isMock` INTEGER NOT NULL,
+                    `createdAt` INTEGER NOT NULL,
+                    `connectionRequestId` TEXT NOT NULL,
+                    PRIMARY KEY(`threadId`)
+                )
+                """.trimIndent()
+            )
+            db.execSQL(
+                """
+                INSERT INTO `chat_threads_new` (
+                    `threadId`, `type`, `peerCrsId`, `groupId`, `displayName`,
+                    `avatarColor`, `lastMessagePreview`, `lastMessageAt`,
+                    `unreadCount`, `isPinned`, `isMuted`, `isMock`,
+                    `createdAt`, `connectionRequestId`
+                )
+                SELECT
+                    `threadId`, `type`, `peerCrsId`, `groupId`, `displayName`,
+                    `avatarColor`, `lastMessagePreview`, `lastMessageAt`,
+                    `unreadCount`, `isPinned`, `isMuted`, `isMock`,
+                    `createdAt`, COALESCE(`connectionRequestId`, '')
+                FROM `chat_threads`
+                """.trimIndent()
+            )
+            db.execSQL("DROP TABLE `chat_threads`")
+            db.execSQL("ALTER TABLE `chat_threads_new` RENAME TO `chat_threads`")
+        }
+    }
+
+    /**
      * Feature 7 (Checkpoint Threat Intelligence) — adds the four
      * spec-aligned columns to the existing `checkpoints` table.
      * Defaults are chosen to match the safest no-info reading
@@ -235,7 +284,8 @@ object DatabaseModule {
             MIGRATION_12_13,
             MIGRATION_14_15,
             MIGRATION_15_16,
-            MIGRATION_16_17
+            MIGRATION_16_17,
+            MIGRATION_17_18
         )
         // NOTE (production-readiness): a destructive fallback remains here as
         // a safety net for the v13→v14 gap (no migration was authored at the
