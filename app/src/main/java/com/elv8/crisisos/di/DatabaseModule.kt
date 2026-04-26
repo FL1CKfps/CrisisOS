@@ -106,6 +106,37 @@ object DatabaseModule {
         }
     }
 
+    /**
+     * Feature 7 — aggregation tally columns for majority-vote
+     * computation. CSV-encoded counts in enum-declaration order so
+     * the schema stays cheap (3 TEXT cols) while still letting the
+     * repository compute argmax on each incoming report and prevent
+     * a single voice from flipping the displayed threat status.
+     */
+    private val MIGRATION_16_17 = object : Migration(16, 17) {
+        override fun migrate(db: SupportSQLiteDatabase) {
+            db.execSQL("ALTER TABLE `checkpoints` ADD COLUMN `threatVotes` TEXT NOT NULL DEFAULT '0,0,0'")
+            db.execSQL("ALTER TABLE `checkpoints` ADD COLUMN `docsVotes` TEXT NOT NULL DEFAULT '0,0,0,0'")
+            db.execSQL("ALTER TABLE `checkpoints` ADD COLUMN `waitVotes` TEXT NOT NULL DEFAULT '0,0,0,0'")
+        }
+    }
+
+    /**
+     * Feature 7 (Checkpoint Threat Intelligence) — adds the four
+     * spec-aligned columns to the existing `checkpoints` table.
+     * Defaults are chosen to match the safest no-info reading
+     * (UNKNOWN threat, NONE docs, UNDER_15M wait, not NGO-verified)
+     * so previously-stored rows render coherently on first launch.
+     */
+    private val MIGRATION_15_16 = object : Migration(15, 16) {
+        override fun migrate(db: SupportSQLiteDatabase) {
+            db.execSQL("ALTER TABLE `checkpoints` ADD COLUMN `threatLevel` TEXT NOT NULL DEFAULT 'UNKNOWN'")
+            db.execSQL("ALTER TABLE `checkpoints` ADD COLUMN `docsRequired` TEXT NOT NULL DEFAULT 'NONE'")
+            db.execSQL("ALTER TABLE `checkpoints` ADD COLUMN `waitTime` TEXT NOT NULL DEFAULT 'UNDER_15M'")
+            db.execSQL("ALTER TABLE `checkpoints` ADD COLUMN `verifiedByNgo` INTEGER NOT NULL DEFAULT 0")
+        }
+    }
+
     private val MIGRATION_14_15 = object : Migration(14, 15) {
         override fun migrate(db: SupportSQLiteDatabase) {
             db.execSQL(
@@ -202,7 +233,9 @@ object DatabaseModule {
             MIGRATION_8_9,
             MIGRATION_11_12,
             MIGRATION_12_13,
-            MIGRATION_14_15
+            MIGRATION_14_15,
+            MIGRATION_15_16,
+            MIGRATION_16_17
         )
         // NOTE (production-readiness): a destructive fallback remains here as
         // a safety net for the v13→v14 gap (no migration was authored at the

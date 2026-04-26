@@ -59,11 +59,80 @@ interface CheckpointDao {
     @Query("UPDATE checkpoints SET safetyRating = :safetyRating, isOpen = :isOpen, notes = :notes, lastUpdated = :lastUpdated WHERE id = :id")
     suspend fun updateRating(id: String, safetyRating: Int, isOpen: Boolean, notes: String, lastUpdated: Long): Int
 
+    @Query("""
+        UPDATE checkpoints
+           SET threatLevel = :threatLevel,
+               docsRequired = :docsRequired,
+               waitTime = :waitTime,
+               threatVotes = :threatVotes,
+               docsVotes = :docsVotes,
+               waitVotes = :waitVotes,
+               isOpen = :isOpen,
+               safetyRating = :safetyRating,
+               notes = :notes,
+               lastUpdated = :lastUpdated,
+               verifiedByNgo = CASE WHEN :verifiedByNgo = 1 THEN 1 ELSE verifiedByNgo END
+         WHERE id = :id
+    """)
+    suspend fun updateThreatReport(
+        id: String,
+        threatLevel: String,
+        docsRequired: String,
+        waitTime: String,
+        threatVotes: String,
+        docsVotes: String,
+        waitVotes: String,
+        isOpen: Boolean,
+        safetyRating: Int,
+        notes: String,
+        lastUpdated: Long,
+        verifiedByNgo: Boolean
+    ): Int
+
     @Query("UPDATE checkpoints SET reportCount = reportCount + 1 WHERE id = :id")
     suspend fun incrementReportCount(id: String): Int
 
     @Query("DELETE FROM checkpoints WHERE lastUpdated < :timestamp")
     suspend fun deleteOlderThan(timestamp: Long): Int
+
+    /**
+     * Wraps `updateThreatReport` + `incrementReportCount` in a single
+     * Room transaction so a vote and its corresponding count bump are
+     * either both applied or neither — preventing reportCount drifting
+     * out of sync with the tally CSVs across crash / coroutine
+     * cancellation boundaries.
+     */
+    @androidx.room.Transaction
+    suspend fun applyAggregateUpdate(
+        id: String,
+        threatLevel: String,
+        docsRequired: String,
+        waitTime: String,
+        threatVotes: String,
+        docsVotes: String,
+        waitVotes: String,
+        isOpen: Boolean,
+        safetyRating: Int,
+        notes: String,
+        lastUpdated: Long,
+        verifiedByNgo: Boolean
+    ) {
+        updateThreatReport(
+            id = id,
+            threatLevel = threatLevel,
+            docsRequired = docsRequired,
+            waitTime = waitTime,
+            threatVotes = threatVotes,
+            docsVotes = docsVotes,
+            waitVotes = waitVotes,
+            isOpen = isOpen,
+            safetyRating = safetyRating,
+            notes = notes,
+            lastUpdated = lastUpdated,
+            verifiedByNgo = verifiedByNgo
+        )
+        incrementReportCount(id)
+    }
 }
 
 @Dao

@@ -125,8 +125,12 @@ fun CrisisNavGraph(
         composable(Screen.DangerZone.route) { 
             DangerZoneScreen(onNavigateBack = { navController.popBackStack() }) 
         }
-        composable(Screen.Checkpoint.route) { 
-            CheckpointScreen(onNavigateBack = { navController.popBackStack() }) 
+        composable(Screen.Checkpoint.route) {
+            CheckpointScreen(
+                onNavigateBack = { navController.popBackStack() },
+                onNavigateToAiAssistant = { navController.navigate(Screen.AiAssistant.route) },
+                onNavigateToMaps = { navController.navigate(Screen.Maps.route) }
+            )
         }
         composable(Screen.AiAssistant.route) { 
             AiAssistantScreen(

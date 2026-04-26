@@ -664,3 +664,83 @@ can address them:
   flagged it as MEDIUM but it matches the plan's literal specification.
 
 Build Android App workflow stays green at the configure phase end-to-end.
+
+## Checkpoint Intel — Feature 7 revamp
+
+The Checkpoint screen and its data layer were rebuilt end-to-end against
+the spec at `CrisisOS_Context.md` lines 352-376.
+
+Domain model:
+- `domain/model/CheckpointEnums.kt` introduces `ThreatLevel`
+  (SAFE / HOSTILE / UNKNOWN), `DocumentsRequired` (NONE / ID /
+  PASSPORT / MULTIPLE), `WaitTime` (UNDER_15M / FIFTEEN_TO_60M /
+  OVER_60M / BLOCKED), and `VerificationStatus` (UNVERIFIED /
+  CONFIRMED / NGO_VERIFIED). Each has a `fromStorage()` companion
+  that decodes unknown future values to the safest default so an
+  older client receiving a newer enum value never crashes.
+- `Checkpoint` (domain) gained `threatLevel`, `docsRequired`,
+  `waitTime`, `verifiedByNgo`, and `lastUpdatedAt`.
+
+Persistence:
+- `MIGRATION_15_16` adds the four spec columns to `checkpoints`.
+- `MIGRATION_16_17` adds three CSV-encoded TEXT tally columns
+  (`threatVotes`, `docsVotes`, `waitVotes`) used by the majority-
+  vote aggregator. CSV order matches each enum's declaration order.
+- DB version is 17; both migrations are registered in
+  `DatabaseModule`.
+
+Aggregation (anti-misuse — Feature 7 spec):
+- `CheckpointRepositoryImpl` no longer last-write-wins. Every
+  incoming report (local OR mesh) bumps the appropriate index in
+  the tally CSVs, and the displayed enum value is recomputed via
+  `argmaxIndex()` with tie-break preferring the previously-displayed
+  aggregate. A single newcomer cannot flip the threat away from a
+  majority.
+- Concurrency: a `voteMutex: Mutex` serializes the entire
+  read→compute→write cycle across both submission paths so two
+  parallel reports cannot read the same baseline tally and lose an
+  increment.
+- DB write atomicity: `CheckpointDao.applyAggregateUpdate` is an
+  `@Transaction` suspend default method that bundles the tally
+  update and the `incrementReportCount` into one transaction, so
+  `reportCount` and the tallies cannot drift across crash /
+  cancellation boundaries.
+- Grid-level dedupe: local submissions match by normalized grid
+  label first, then by (label + name), so accidentally creating a
+  fresh report for the same grid coalesces into the existing row.
+- 2-hour TTL: `REPORT_TTL_MS = 2L * 60L * 60L * 1000L`. Stale rows
+  are purged by `purgeStaleReports()` on the existing cleanup chain.
+- NGO override: `isNgoAlias()` is aligned 1:1 with
+  `NewsRepositoryImpl.isNgoAlias()` — strict
+  `startsWith("NGO_") || endsWith("_OFFICIAL")`, NOT substring
+  matching. An NGO peer flagging a checkpoint SAFE marks it
+  `verifiedByNgo = true` for everyone. Same caveat as elsewhere:
+  alias-only authority is best-effort defense-in-depth and is the
+  right place to slot a future PKI.
+
+UI / UX (CheckpointScreen):
+- Privacy banner at the top makes the spec's "no CRS ID is ever
+  attached to a checkpoint report" guarantee explicit to the user.
+- Threat-color cards (green / amber / red) with a verification
+  badge — `NGO VERIFIED` / `CONFIRMED · N reports` / `UNVERIFIED ·
+  needs corroboration`.
+- `MetaPill` row surfaces wait time, docs required, threat label,
+  and a freshness countdown that re-ticks every 60s via
+  `produceState`.
+- Reroute + Negotiation Script CTAs are gated behind
+  `verification != UNVERIFIED` — a single anonymous report cannot
+  trigger high-impact actions. A softer "unlock once a second
+  report corroborates this" hint replaces them otherwise.
+- Bottom-sheet 7-step report flow with chips for each enum, an
+  optional anonymous note (no CRS ID stored or transmitted), and
+  the freshness disclosure. Sheet state survives rotation via
+  `rememberSaveable`.
+- "How this feed works" expander explains 1km² grid aggregation,
+  2h auto-expiry, ≥2 reports for CONFIRMED, NGO override, and the
+  anti-misuse mechanism — exactly mirroring the spec language.
+- Reroute CTA navigates to `Screen.Maps`; Negotiation Script CTA
+  navigates to `Screen.AiAssistant` with a checkpoint-context
+  preset.
+
+Build Android App workflow remains green end-to-end at the configure
+phase across all three architect-review iterations.
