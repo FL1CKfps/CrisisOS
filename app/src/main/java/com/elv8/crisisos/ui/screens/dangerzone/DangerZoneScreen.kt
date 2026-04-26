@@ -133,7 +133,7 @@ fun DangerZoneScreen(
         ReportZoneBottomSheet(
             onDismiss = { sheetVisible = false },
             onSubmit = { title, desc, level, loc ->
-                viewModel.reportZone(title, desc, level, loc)
+                viewModel.reportNewZone(title, desc, level, loc)
                 sheetVisible = false
             }
         )
@@ -253,6 +253,67 @@ fun ReportZoneBottomSheet(onDismiss: () -> Unit, onSubmit: (String, String, Thre
             OutlinedTextField(value = description, onValueChange = { description = it }, label = { Text("Description") }, modifier = Modifier.fillMaxWidth(), minLines = 3)
             Spacer(modifier = Modifier.height(12.dp))
             OutlinedTextField(value = location, onValueChange = { location = it }, label = { Text("Location (Approx distance or intersection)") }, modifier = Modifier.fillMaxWidth(), singleLine = true)
+        }
+    }
+}
+
+@Composable
+private fun HeaderCard(uiState: DangerZoneUiState) {
+    CrisisCard(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp, vertical = 12.dp),
+        containerColor = MaterialTheme.colorScheme.surfaceVariant
+    ) {
+        Column(modifier = Modifier.padding(16.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Icon(
+                    imageVector = Icons.Default.WarningAmber,
+                    contentDescription = null,
+                    tint = Color(0xFFFF9800)
+                )
+                Spacer(modifier = Modifier.width(8.dp))
+                Text(
+                    text = "Active Threat Zones",
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold
+                )
+            }
+            Spacer(modifier = Modifier.height(4.dp))
+            Text(
+                text = "${uiState.zones.size} reported  ${uiState.userLocation}",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
+    }
+}
+
+@OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
+@Composable
+private fun FilterChipsRow(
+    selectedFilter: ThreatLevel?,
+    onFilterSelected: (ThreatLevel?) -> Unit
+) {
+    val options: List<Pair<String, ThreatLevel?>> = listOf(
+        "All" to null,
+        "Low" to ThreatLevel.LOW,
+        "Medium" to ThreatLevel.MEDIUM,
+        "High" to ThreatLevel.HIGH,
+        "Critical" to ThreatLevel.CRITICAL
+    )
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp),
+        horizontalArrangement = Arrangement.spacedBy(8.dp)
+    ) {
+        options.forEach { (label, value) ->
+            androidx.compose.material3.FilterChip(
+                selected = selectedFilter == value,
+                onClick = { onFilterSelected(value) },
+                label = { Text(label) }
+            )
         }
     }
 }
