@@ -1,5 +1,13 @@
 package com.elv8.crisisos.domain.model
 
+enum class ThreatLevel {
+    LOW,
+    MEDIUM,
+    HIGH,
+    CRITICAL,
+    UNKNOWN
+}
+
 data class DangerZone(
     val id: String,
     val title: String,

@@ -8,9 +8,9 @@ package com.elv8.crisisos.domain.model
  */
 
 enum class ThreatLevel {
-    SAFE,      // Crowdsourced "safe" / minor friction
-    HOSTILE,   // Reported aggressive, denials, harassment, danger
-    UNKNOWN;   // Not enough info, or first-touch report
+    SAFE,
+    HOSTILE,
+    UNKNOWN;
 
     companion object {
         fun fromStorage(raw: String?): ThreatLevel = when (raw?.uppercase()) {
@@ -38,10 +38,10 @@ enum class DocumentsRequired {
 }
 
 enum class WaitTime {
-    UNDER_15M,        // <15 min
-    FIFTEEN_TO_60M,   // 15-60 min
-    OVER_60M,         // 1 hr +
-    BLOCKED;          // Cannot pass at all
+    UNDER_15M,
+    FIFTEEN_TO_60M,
+    OVER_60M,
+    BLOCKED;
 
     companion object {
         fun fromStorage(raw: String?): WaitTime = when (raw?.uppercase()) {
