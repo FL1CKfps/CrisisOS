@@ -27,10 +27,18 @@ import java.util.Locale
 import javax.inject.Inject
 
 /**
- * @param crsId    Stable mesh identity for the contact.
- * @param label    Human-readable display label, e.g. "Sister — Priya".
+ * An escalation contact reachable via at least one channel.
+ *
+ * Per CrisisOS_Context.md → Feature 5, recipients are designated by either
+ * a CRS ID (for in-mesh delivery) or a phone number (for SMS fallback when
+ * the worker eventually gates an SMS provider). Both can be present; at
+ * least one must be non-blank. [label] is a display alias.
  */
-data class EscalationContact(val crsId: String, val label: String)
+data class EscalationContact(
+    val crsId: String,
+    val label: String,
+    val phoneNumber: String? = null
+)
 
 data class DeadManUiState(
     val isActive: Boolean = false,
@@ -206,11 +214,18 @@ class DeadManViewModel @Inject constructor(
         message: String,
         contacts: List<EscalationContact>
     ) {
-        // Pass a stable descriptor (CRS ID + label) so the worker payload
-        // carries something the recipient can act on even if the alias is
-        // renamed before the worker fires.
-        val descriptors = contacts.map {
-            if (it.crsId.isNotBlank()) "${it.label} <${it.crsId}>" else it.label
+        // Build a stable wire descriptor per contact. Format examples:
+        //   "Mom <CRS-7K3M-9X2P>"
+        //   "Mom <tel:+919876543210>"
+        //   "Mom <CRS-7K3M-9X2P|tel:+919876543210>"
+        // Worker carries this verbatim so peers (or future SMS gateway nodes)
+        // can route on whichever channel they support.
+        val descriptors = contacts.map { c ->
+            val ids = buildList {
+                if (c.crsId.isNotBlank()) add(c.crsId)
+                if (!c.phoneNumber.isNullOrBlank()) add("tel:${c.phoneNumber}")
+            }
+            if (ids.isEmpty()) c.label else "${c.label} <${ids.joinToString("|")}>"
         }
         val request = DeadManWorker.buildRequest(intervalMinutes, message, descriptors)
         workManager.enqueueUniqueWork(
@@ -251,27 +266,43 @@ class DeadManViewModel @Inject constructor(
     }
 
     /**
-     * Inline add-by-CRS-ID flow. Validates non-blank ID and rejects duplicates;
-     * the label is optional and falls back to the CRS ID for display.
-     * Persistence is intentionally NOT triggered here — escalation contacts are
-     * snapshotted into prefs + WorkManager input data only at activate(),
-     * matching the existing model where switch-off edits are draft-only.
+     * Inline add flow per CrisisOS_Context.md → Feature 5: recipients are
+     * designated by CRS ID OR phone number (or both). Validates that at
+     * least one of [rawCrsId] / [rawPhone] is non-blank and rejects
+     * duplicates on either field. Label is optional; falls back to CRS ID
+     * or phone number for display.
+     *
+     * Persistence is intentionally NOT triggered here — escalation contacts
+     * are snapshotted into prefs + WorkManager input data only at
+     * activate(), matching the existing draft-edit-then-arm flow.
      */
-    fun addContactByCrsId(rawCrsId: String, rawLabel: String) {
+    fun addEscalationContact(rawCrsId: String, rawPhone: String, rawLabel: String) {
         val crsId = rawCrsId.trim()
+        val phone = rawPhone.trim()
         val label = rawLabel.trim()
-        if (crsId.isBlank()) {
-            _uiState.update { it.copy(addContactError = "CRS ID is required.") }
+
+        if (crsId.isBlank() && phone.isBlank()) {
+            _uiState.update {
+                it.copy(addContactError = "Enter a CRS ID or a phone number.")
+            }
             return
         }
         val current = _uiState.value.escalationContacts
-        if (current.any { it.crsId.equals(crsId, ignoreCase = true) }) {
-            _uiState.update { it.copy(addContactError = "That contact is already on the list.") }
+        val crsClash = crsId.isNotBlank() &&
+            current.any { it.crsId.equals(crsId, ignoreCase = true) }
+        val phoneClash = phone.isNotBlank() &&
+            current.any { !it.phoneNumber.isNullOrBlank() && it.phoneNumber.equals(phone, ignoreCase = true) }
+        if (crsClash || phoneClash) {
+            _uiState.update {
+                it.copy(addContactError = "That contact is already on the list.")
+            }
             return
         }
+
         val newContact = EscalationContact(
             crsId = crsId,
-            label = if (label.isNotBlank()) label else crsId
+            label = label.ifBlank { if (crsId.isNotBlank()) crsId else phone },
+            phoneNumber = phone.takeIf { it.isNotBlank() }
         )
         _uiState.update {
             it.copy(
@@ -295,11 +326,29 @@ class DeadManViewModel @Inject constructor(
         _uiState.update { it.copy(alertMessage = message) }
     }
 
+    /**
+     * Composite identity for [EscalationContact] now that CRS ID is optional.
+     * Two contacts are considered the same if their CRS IDs match
+     * (case-insensitive, both non-blank) OR their phone numbers match
+     * (case-insensitive, both non-blank). This prevents two distinct
+     * phone-only contacts from collapsing into each other on remove/toggle
+     * (both would otherwise share `crsId == ""`).
+     */
+    private fun EscalationContact.isSameAs(other: EscalationContact): Boolean {
+        val crsMatch = crsId.isNotBlank() &&
+            other.crsId.isNotBlank() &&
+            crsId.equals(other.crsId, ignoreCase = true)
+        val phoneMatch = !phoneNumber.isNullOrBlank() &&
+            !other.phoneNumber.isNullOrBlank() &&
+            phoneNumber.equals(other.phoneNumber, ignoreCase = true)
+        return crsMatch || phoneMatch
+    }
+
     fun toggleContact(contact: EscalationContact) {
         _uiState.update { state ->
-            val exists = state.escalationContacts.any { it.crsId == contact.crsId }
+            val exists = state.escalationContacts.any { it.isSameAs(contact) }
             val next = if (exists) {
-                state.escalationContacts.filterNot { it.crsId == contact.crsId }
+                state.escalationContacts.filterNot { it.isSameAs(contact) }
             } else {
                 state.escalationContacts + contact
             }
@@ -309,7 +358,7 @@ class DeadManViewModel @Inject constructor(
 
     fun removeContact(contact: EscalationContact) {
         _uiState.update {
-            it.copy(escalationContacts = it.escalationContacts.filterNot { c -> c.crsId == contact.crsId })
+            it.copy(escalationContacts = it.escalationContacts.filterNot { c -> c.isSameAs(contact) })
         }
     }
 
@@ -340,6 +389,9 @@ class DeadManViewModel @Inject constructor(
             val obj = org.json.JSONObject()
             obj.put("crsId", c.crsId)
             obj.put("label", c.label)
+            // Forward-compatible: omit when null so older builds reading the
+            // same JSON simply ignore an absent key.
+            c.phoneNumber?.takeIf { it.isNotBlank() }?.let { obj.put("phone", it) }
             arr.put(obj)
         }
         return arr.toString()
@@ -351,9 +403,11 @@ class DeadManViewModel @Inject constructor(
             val obj = arr.getJSONObject(i)
             EscalationContact(
                 crsId = obj.optString("crsId"),
-                label = obj.optString("label")
+                label = obj.optString("label"),
+                phoneNumber = obj.optString("phone").takeIf { it.isNotBlank() }
             )
-        }.filter { it.crsId.isNotBlank() }
+            // A contact is valid if EITHER channel is present.
+        }.filter { it.crsId.isNotBlank() || !it.phoneNumber.isNullOrBlank() }
     } catch (_: Exception) {
         emptyList()
     }

@@ -1,5 +1,18 @@
 package com.elv8.crisisos.ui.screens.deadman
 
+// DEAD MAN SWITCH SCREEN — Feature 5 (CrisisOS_Context.md)
+//
+// This screen is the user-facing surface for everything Feature 5 promises:
+//   • Configurable interval (canonical 6h/12h/24h/48h + short demo intervals)
+//   • Pre-composed message
+//   • Recipients designated by CRS ID OR phone number (or both)
+//   • Live armed/disarmed status with countdown ring
+//   • Pre-deadline silent reminder note (30 min before)
+//   • Transparency panel listing exactly what gets transmitted
+//   • Multi-channel delivery badges (Mesh / Push / SMS / Email)
+//   • Auto-initiated Missing Person search note (ecosystem trigger → Feature 6)
+//   • Resilience guarantees (phone dies / no internet / no recipient connectivity)
+
 import android.annotation.SuppressLint
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.animateColorAsState
@@ -11,6 +24,7 @@ import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.expandVertically
 import androidx.compose.animation.shrinkVertically
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -18,6 +32,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -37,11 +52,21 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.Message
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Bluetooth
+import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Group
+import androidx.compose.material.icons.filled.Info
+import androidx.compose.material.icons.filled.LocationOn
+import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.filled.Person
+import androidx.compose.material.icons.filled.PersonSearch
+import androidx.compose.material.icons.filled.PhoneAndroid
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Schedule
+import androidx.compose.material.icons.filled.Security
+import androidx.compose.material.icons.filled.Send
+import androidx.compose.material.icons.filled.Shield
 import androidx.compose.material.icons.filled.Stop
 import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.*
@@ -54,29 +79,17 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardCapitalization
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.elv8.crisisos.ui.components.LocalTopBarState
 
-/**
- * DEAD MAN SWITCH — Feature 5
- *
- * Visual hierarchy (top → bottom):
- *   1. Hero timer ring with status pill (ARMED / DISARMED).
- *   2. Active state: prominent green CHECK IN button + setting summary card.
- *   3. Inactive state: scrollable settings cards (Interval, Message, Contacts).
- *   4. Inline error banner.
- *   5. Sticky-ish ACTIVATE / DEACTIVATE bottom CTA.
- *
- * Contacts are added inline by CRS ID via [AddContactDialog] — no external
- * "Contacts" page is required. Family contacts already known to the app
- * (when present) are exposed as one-tap quick-pick chips inside the dialog.
- */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun DeadManScreen(
@@ -102,8 +115,6 @@ fun DeadManScreen(
             .fillMaxSize()
             .background(MaterialTheme.colorScheme.background)
     ) {
-        // Scrollable content. Sticky CTA lives outside this column so it
-        // doesn't scroll out of reach when contact lists grow tall.
         Column(
             modifier = Modifier
                 .fillMaxWidth()
@@ -112,7 +123,7 @@ fun DeadManScreen(
                 .padding(horizontal = 20.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            Spacer(modifier = Modifier.height(16.dp))
+            Spacer(modifier = Modifier.height(12.dp))
 
             TimerSection(uiState = uiState)
 
@@ -120,13 +131,23 @@ fun DeadManScreen(
 
             StatusPill(isActive = uiState.isActive)
 
-            Spacer(modifier = Modifier.height(24.dp))
+            Spacer(modifier = Modifier.height(20.dp))
 
             AnimatedVisibility(visible = uiState.isActive) {
                 Column(modifier = Modifier.fillMaxWidth()) {
                     CheckInButton(onClick = { viewModel.checkIn() })
+                    Spacer(modifier = Modifier.height(12.dp))
+                    Text(
+                        text = "You'll get a silent reminder 30 minutes before the deadline.",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
                     Spacer(modifier = Modifier.height(16.dp))
                     ArmedSummaryCard(uiState = uiState)
+                    Spacer(modifier = Modifier.height(12.dp))
+                    DeliveryChannelsRow()
+                    Spacer(modifier = Modifier.height(12.dp))
+                    EcosystemTriggerCard()
                 }
             }
 
@@ -144,9 +165,6 @@ fun DeadManScreen(
                 )
             }
 
-            // Inline error surface — replaces the previous silent no-op when the
-            // user tapped Activate without contacts or tried to change settings
-            // while the switch was already armed.
             AnimatedVisibility(visible = uiState.errorMessage != null) {
                 uiState.errorMessage?.let { msg ->
                     Spacer(modifier = Modifier.height(12.dp))
@@ -154,7 +172,7 @@ fun DeadManScreen(
                 }
             }
 
-            Spacer(modifier = Modifier.height(24.dp))
+            Spacer(modifier = Modifier.height(20.dp))
         }
 
         // Sticky bottom CTA — always visible regardless of scroll position.
@@ -162,7 +180,7 @@ fun DeadManScreen(
             modifier = Modifier
                 .fillMaxWidth()
                 .background(MaterialTheme.colorScheme.background)
-                .padding(horizontal = 20.dp, vertical = 16.dp)
+                .padding(horizontal = 20.dp, vertical = 14.dp)
         ) {
             ActivateToggle(uiState = uiState, onToggle = {
                 if (uiState.isActive) viewModel.deactivate() else viewModel.activate()
@@ -175,7 +193,9 @@ fun DeadManScreen(
             availableFamilyContacts = uiState.availableFamilyContacts,
             alreadyAdded = uiState.escalationContacts,
             inlineError = uiState.addContactError,
-            onAdd = { crsId, label -> viewModel.addContactByCrsId(crsId, label) },
+            onAdd = { crsId, phone, label ->
+                viewModel.addEscalationContact(crsId, phone, label)
+            },
             onClearError = { viewModel.clearAddContactError() },
             onDismiss = { viewModel.dismissAddContactDialog() }
         )
@@ -191,7 +211,6 @@ fun DeadManScreen(
 private fun TimerSection(uiState: DeadManUiState) {
     val totalSeconds = uiState.intervalMinutes * 60f
     val currentSeconds = uiState.timeRemainingSeconds.toFloat()
-
     val progress = if (totalSeconds > 0) currentSeconds / totalSeconds else 0f
 
     val animatedProgress by animateFloatAsState(
@@ -200,7 +219,6 @@ private fun TimerSection(uiState: DeadManUiState) {
         label = "progressAnim"
     )
 
-    // Color shifts toward warning red as the timer drains, but only when armed.
     val ringColor by animateColorAsState(
         targetValue = when {
             !uiState.isActive -> MaterialTheme.colorScheme.primary.copy(alpha = 0.35f)
@@ -218,7 +236,6 @@ private fun TimerSection(uiState: DeadManUiState) {
         modifier = Modifier.size(260.dp)
     ) {
         Canvas(modifier = Modifier.fillMaxSize()) {
-            // Track
             drawArc(
                 color = trackColor,
                 startAngle = 0f,
@@ -226,7 +243,6 @@ private fun TimerSection(uiState: DeadManUiState) {
                 useCenter = false,
                 style = Stroke(width = 18.dp.toPx(), cap = StrokeCap.Round)
             )
-            // Progress
             drawArc(
                 color = ringColor,
                 startAngle = -90f,
@@ -249,18 +265,18 @@ private fun TimerSection(uiState: DeadManUiState) {
 
             Text(
                 text = timeString,
-                fontSize = 48.sp,
+                fontSize = 46.sp,
                 fontWeight = FontWeight.Bold,
                 color = MaterialTheme.colorScheme.onBackground
             )
-            Spacer(modifier = Modifier.height(4.dp))
+            Spacer(modifier = Modifier.height(2.dp))
             Text(
                 text = if (uiState.isActive) "TIME REMAINING" else "READY",
                 style = MaterialTheme.typography.labelSmall,
                 fontWeight = FontWeight.SemiBold,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
-            Spacer(modifier = Modifier.height(8.dp))
+            Spacer(modifier = Modifier.height(6.dp))
             Text(
                 text = "Last check-in · ${uiState.lastCheckIn}",
                 style = MaterialTheme.typography.labelSmall,
@@ -296,7 +312,6 @@ private fun StatusPill(isActive: Boolean) {
         verticalAlignment = Alignment.CenterVertically
     ) {
         if (isActive) {
-            // Pulsing dot signals "live monitoring".
             val transition = rememberInfiniteTransition(label = "pulse")
             val alpha by transition.animateFloat(
                 initialValue = 0.35f,
@@ -330,7 +345,7 @@ private fun StatusPill(isActive: Boolean) {
 }
 
 // ────────────────────────────────────────────────────────────────────────────
-// CHECK-IN + ARMED SUMMARY
+// CHECK-IN + ARMED VIEW
 // ────────────────────────────────────────────────────────────────────────────
 
 @Composable
@@ -343,8 +358,10 @@ private fun CheckInButton(onClick: () -> Unit) {
         colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF22C55E)),
         shape = RoundedCornerShape(20.dp)
     ) {
+        Icon(Icons.Default.CheckCircle, contentDescription = null, tint = Color.White)
+        Spacer(modifier = Modifier.width(10.dp))
         Text(
-            text = "✓  CHECK IN NOW",
+            text = "I'M OKAY — CHECK IN",
             style = MaterialTheme.typography.titleLarge,
             fontWeight = FontWeight.Bold,
             color = Color.White
@@ -362,27 +379,42 @@ private fun ArmedSummaryCard(uiState: DeadManUiState) {
         )
     ) {
         Column(modifier = Modifier.padding(16.dp)) {
-            SummaryRow(
-                icon = Icons.Default.Schedule,
-                label = "Interval",
-                value = formatInterval(uiState.intervalMinutes)
+            Text(
+                text = "WHAT RECIPIENTS WILL RECEIVE",
+                style = MaterialTheme.typography.labelSmall,
+                fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
             )
             Spacer(modifier = Modifier.height(10.dp))
             SummaryRow(
-                icon = Icons.Default.Group,
-                label = "Will alert",
-                value = if (uiState.escalationContacts.isEmpty()) {
-                    "—"
-                } else {
-                    "${uiState.escalationContacts.size} contact${if (uiState.escalationContacts.size == 1) "" else "s"}"
-                }
+                icon = Icons.Default.Person,
+                label = "Your CRS ID",
+                value = "Identifies you to family / NGOs"
             )
-            Spacer(modifier = Modifier.height(10.dp))
+            Spacer(modifier = Modifier.height(8.dp))
+            SummaryRow(
+                icon = Icons.Default.LocationOn,
+                label = "Last known GPS",
+                value = "Plus accuracy and timestamp"
+            )
+            Spacer(modifier = Modifier.height(8.dp))
+            SummaryRow(
+                icon = Icons.Default.Shield,
+                label = "Last camp checked into",
+                value = "If known"
+            )
+            Spacer(modifier = Modifier.height(8.dp))
             SummaryRow(
                 icon = Icons.AutoMirrored.Filled.Message,
-                label = "Message",
+                label = "Your pre-written note",
                 value = uiState.alertMessage,
                 multiLine = true
+            )
+            Spacer(modifier = Modifier.height(8.dp))
+            SummaryRow(
+                icon = Icons.Default.Schedule,
+                label = "Trigger interval",
+                value = "${formatInterval(uiState.intervalMinutes)} (${uiState.escalationContacts.size} contact${if (uiState.escalationContacts.size == 1) "" else "s"})"
             )
         }
     }
@@ -390,7 +422,7 @@ private fun ArmedSummaryCard(uiState: DeadManUiState) {
 
 @Composable
 private fun SummaryRow(
-    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    icon: ImageVector,
     label: String,
     value: String,
     multiLine: Boolean = false
@@ -415,14 +447,156 @@ private fun SummaryRow(
                 text = value,
                 style = MaterialTheme.typography.bodyMedium,
                 fontWeight = FontWeight.Medium,
-                maxLines = if (multiLine) 3 else 1
+                maxLines = if (multiLine) 4 else 1
             )
         }
     }
 }
 
+@Composable
+private fun DeliveryChannelsRow() {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(16.dp),
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.surface
+        ),
+        border = BorderStroke(
+            1.dp,
+            MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.6f)
+        )
+    ) {
+        Column(modifier = Modifier.padding(14.dp)) {
+            Text(
+                text = "DELIVERY CHANNELS",
+                style = MaterialTheme.typography.labelSmall,
+                fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+            Spacer(modifier = Modifier.height(8.dp))
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                ChannelChip(
+                    icon = Icons.Default.Bluetooth,
+                    label = "Mesh",
+                    available = true,
+                    modifier = Modifier.weight(1f)
+                )
+                ChannelChip(
+                    icon = Icons.Default.Notifications,
+                    label = "Push",
+                    available = true,
+                    modifier = Modifier.weight(1f)
+                )
+                ChannelChip(
+                    icon = Icons.Default.PhoneAndroid,
+                    label = "SMS",
+                    available = false,
+                    modifier = Modifier.weight(1f)
+                )
+                ChannelChip(
+                    icon = Icons.Default.Send,
+                    label = "Email",
+                    available = false,
+                    modifier = Modifier.weight(1f)
+                )
+            }
+            Spacer(modifier = Modifier.height(6.dp))
+            Text(
+                text = "Mesh + push always on. SMS/email queued via NGO anchor when online.",
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
+    }
+}
+
+@Composable
+private fun ChannelChip(
+    icon: ImageVector,
+    label: String,
+    available: Boolean,
+    modifier: Modifier = Modifier
+) {
+    val bg = if (available) {
+        MaterialTheme.colorScheme.primary.copy(alpha = 0.12f)
+    } else {
+        MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
+    }
+    val fg = if (available) {
+        MaterialTheme.colorScheme.primary
+    } else {
+        MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
+    }
+    Column(
+        modifier = modifier
+            .background(bg, RoundedCornerShape(10.dp))
+            .padding(vertical = 8.dp),
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+        Icon(icon, contentDescription = null, modifier = Modifier.size(18.dp), tint = fg)
+        Spacer(modifier = Modifier.height(4.dp))
+        Text(
+            text = label,
+            style = MaterialTheme.typography.labelSmall,
+            fontWeight = FontWeight.SemiBold,
+            color = fg
+        )
+        if (!available) {
+            Text(
+                text = "soon",
+                style = MaterialTheme.typography.labelSmall,
+                fontSize = 9.sp,
+                color = fg.copy(alpha = 0.6f)
+            )
+        }
+    }
+}
+
+@Composable
+private fun EcosystemTriggerCard() {
+    // Per CrisisOS_Context.md: "Dead man's switch firing automatically
+    // initiates a Missing Person search (Feature 6) for the user's CRS ID."
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(16.dp),
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.tertiaryContainer.copy(alpha = 0.4f)
+        )
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(14.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Icon(
+                Icons.Default.PersonSearch,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.tertiary,
+                modifier = Modifier.size(22.dp)
+            )
+            Spacer(modifier = Modifier.width(10.dp))
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = "Auto Missing-Person search",
+                    style = MaterialTheme.typography.bodyMedium,
+                    fontWeight = FontWeight.SemiBold
+                )
+                Text(
+                    text = "If this fires, the mesh starts searching for your CRS ID automatically.",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+        }
+    }
+}
+
 // ────────────────────────────────────────────────────────────────────────────
-// SETTINGS SECTION (inactive state)
+// SETTINGS (DISARMED VIEW)
 // ────────────────────────────────────────────────────────────────────────────
 
 @Composable
@@ -443,12 +617,14 @@ private fun SettingsSection(
             onAddContact = onAddContact,
             onRemoveContact = onRemoveContact
         )
+        Spacer(modifier = Modifier.height(12.dp))
+        ResilienceCard()
     }
 }
 
 @Composable
 private fun SectionCard(
-    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    icon: ImageVector,
     title: String,
     trailing: (@Composable () -> Unit)? = null,
     content: @Composable ColumnScope.() -> Unit
@@ -460,7 +636,7 @@ private fun SectionCard(
             containerColor = MaterialTheme.colorScheme.surface
         ),
         elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
-        border = androidx.compose.foundation.BorderStroke(
+        border = BorderStroke(
             1.dp,
             MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.6f)
         )
@@ -497,20 +673,37 @@ private fun IntervalCard(
     onIntervalSelected: (Int) -> Unit
 ) {
     SectionCard(icon = Icons.Default.Schedule, title = "Timer interval") {
-        val intervals = listOf(15 to "15m", 30 to "30m", 60 to "1h", 120 to "2h", 240 to "4h")
+        // Ordered: short demo intervals first, then the canonical 6h/12h/24h/48h
+        // set called out in CrisisOS_Context.md → Feature 5 Setup.
+        val intervals = listOf(
+            15 to "15m",
+            30 to "30m",
+            60 to "1h",
+            120 to "2h",
+            240 to "4h",
+            360 to "6h",
+            720 to "12h",
+            1440 to "24h",
+            2880 to "48h"
+        )
         LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             items(intervals) { (mins, label) ->
                 val selected = uiState.intervalMinutes == mins
                 FilterChip(
                     selected = selected,
                     onClick = { onIntervalSelected(mins) },
-                    label = { Text(label, fontWeight = if (selected) FontWeight.Bold else FontWeight.Normal) }
+                    label = {
+                        Text(
+                            label,
+                            fontWeight = if (selected) FontWeight.Bold else FontWeight.Normal
+                        )
+                    }
                 )
             }
         }
         Spacer(modifier = Modifier.height(8.dp))
         Text(
-            text = "If you don't check in within this window, your contacts get alerted automatically.",
+            text = "If you don't tap \"I'm okay\" within this window, your contacts get alerted automatically. A silent reminder fires 30 min before deadline.",
             style = MaterialTheme.typography.labelSmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant
         )
@@ -529,7 +722,15 @@ private fun MessageCard(
             modifier = Modifier.fillMaxWidth(),
             maxLines = 4,
             shape = RoundedCornerShape(12.dp),
-            placeholder = { Text("e.g. I haven't checked in. Send help.") }
+            placeholder = {
+                Text("e.g. I was heading to Camp B. Contact Mom +91 98765 43210.")
+            }
+        )
+        Spacer(modifier = Modifier.height(6.dp))
+        Text(
+            text = "Sent verbatim to every recipient alongside your CRS ID, GPS, and last camp.",
+            style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
         )
     }
 }
@@ -544,12 +745,9 @@ private fun ContactsCard(
         icon = Icons.Default.Group,
         title = "Escalation contacts",
         trailing = {
-            // Compact "+ Add" pill instead of a bare icon — clearer affordance.
             FilledTonalButton(
                 onClick = onAddContact,
-                contentPadding = androidx.compose.foundation.layout.PaddingValues(
-                    horizontal = 12.dp, vertical = 6.dp
-                ),
+                contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp),
                 shape = RoundedCornerShape(50)
             ) {
                 Icon(
@@ -569,6 +767,12 @@ private fun ContactsCard(
                 if (index > 0) Spacer(modifier = Modifier.height(8.dp))
                 ContactRow(contact = contact, onRemove = { onRemoveContact(contact) })
             }
+            Spacer(modifier = Modifier.height(8.dp))
+            Text(
+                text = "Recipients are addressed by CRS ID (in-mesh) or phone (SMS fallback).",
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
         }
     }
 }
@@ -600,7 +804,7 @@ private fun EmptyContactsState(onAddContact: () -> Unit) {
         )
         Spacer(modifier = Modifier.height(2.dp))
         Text(
-            text = "Add at least one CRS ID to receive your alert.",
+            text = "Add at least one CRS ID or phone number to receive your alert.",
             style = MaterialTheme.typography.labelSmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant
         )
@@ -625,8 +829,6 @@ private fun ContactRow(contact: EscalationContact, onRemove: () -> Unit) {
             .padding(horizontal = 12.dp, vertical = 10.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        // Avatar circle with initial — gives the list visual texture without
-        // relying on real avatars (which we don't carry in escalation state).
         Box(
             modifier = Modifier
                 .size(36.dp)
@@ -647,14 +849,19 @@ private fun ContactRow(contact: EscalationContact, onRemove: () -> Unit) {
         Spacer(modifier = Modifier.width(12.dp))
         Column(modifier = Modifier.weight(1f)) {
             Text(
-                text = contact.label.ifBlank { contact.crsId },
+                text = contact.label.ifBlank { contact.crsId.ifBlank { contact.phoneNumber.orEmpty() } },
                 style = MaterialTheme.typography.bodyMedium,
                 fontWeight = FontWeight.SemiBold,
                 maxLines = 1
             )
-            if (contact.label.isNotBlank() && contact.crsId.isNotBlank() && contact.label != contact.crsId) {
+            // Channel badges + secondary identifiers underneath the label.
+            val secondary = buildList {
+                if (contact.crsId.isNotBlank() && contact.crsId != contact.label) add(contact.crsId)
+                if (!contact.phoneNumber.isNullOrBlank()) add("☎ ${contact.phoneNumber}")
+            }.joinToString("  •  ")
+            if (secondary.isNotBlank()) {
                 Text(
-                    text = contact.crsId,
+                    text = secondary,
                     style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     maxLines = 1
@@ -675,8 +882,49 @@ private fun ContactRow(contact: EscalationContact, onRemove: () -> Unit) {
     }
 }
 
+@Composable
+private fun ResilienceCard() {
+    // Per CrisisOS_Context.md → Feature 5 "Loopholes handled".
+    SectionCard(icon = Icons.Default.Security, title = "Resilience") {
+        ResilienceLine(
+            icon = Icons.Default.PhoneAndroid,
+            text = "Phone dies before deadline → mesh anchor still fires the alert."
+        )
+        Spacer(modifier = Modifier.height(8.dp))
+        ResilienceLine(
+            icon = Icons.Default.Bluetooth,
+            text = "No internet since last sync → uses last sync timestamp; fires anyway."
+        )
+        Spacer(modifier = Modifier.height(8.dp))
+        ResilienceLine(
+            icon = Icons.Default.Send,
+            text = "No connectivity to recipients → alert is queued and retried via every available channel."
+        )
+    }
+}
+
+@Composable
+private fun ResilienceLine(icon: ImageVector, text: String) {
+    Row(verticalAlignment = Alignment.Top) {
+        Icon(
+            imageVector = icon,
+            contentDescription = null,
+            modifier = Modifier
+                .size(16.dp)
+                .padding(top = 2.dp),
+            tint = MaterialTheme.colorScheme.primary.copy(alpha = 0.8f)
+        )
+        Spacer(modifier = Modifier.width(8.dp))
+        Text(
+            text = text,
+            style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+    }
+}
+
 // ────────────────────────────────────────────────────────────────────────────
-// ADD CONTACT DIALOG (inline by CRS ID)
+// ADD CONTACT DIALOG (CRS ID and / or phone number)
 // ────────────────────────────────────────────────────────────────────────────
 
 @Composable
@@ -684,11 +932,12 @@ private fun AddContactDialog(
     availableFamilyContacts: List<EscalationContact>,
     alreadyAdded: List<EscalationContact>,
     inlineError: String?,
-    onAdd: (crsId: String, label: String) -> Unit,
+    onAdd: (crsId: String, phone: String, label: String) -> Unit,
     onClearError: () -> Unit,
     onDismiss: () -> Unit
 ) {
     var crsId by rememberSaveable { mutableStateOf("") }
+    var phone by rememberSaveable { mutableStateOf("") }
     var label by rememberSaveable { mutableStateOf("") }
 
     val addedIds = remember(alreadyAdded) { alreadyAdded.map { it.crsId.lowercase() }.toSet() }
@@ -696,15 +945,15 @@ private fun AddContactDialog(
         availableFamilyContacts.filter { it.crsId.lowercase() !in addedIds }
     }
 
+    val canAdd = crsId.isNotBlank() || phone.isNotBlank()
+
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = {
-            Text("Add escalation contact", fontWeight = FontWeight.Bold)
-        },
+        title = { Text("Add escalation contact", fontWeight = FontWeight.Bold) },
         text = {
             Column(modifier = Modifier.fillMaxWidth()) {
                 Text(
-                    text = "Enter the CRS ID of the person who should receive your alert if you don't check in.",
+                    text = "Designated by CRS ID, phone number, or both. They'll receive your alert if you don't check in.",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
@@ -716,7 +965,7 @@ private fun AddContactDialog(
                         crsId = it
                         if (inlineError != null) onClearError()
                     },
-                    label = { Text("CRS ID *") },
+                    label = { Text("CRS ID") },
                     placeholder = { Text("e.g. CRS-7K3M-9X2P") },
                     singleLine = true,
                     isError = inlineError != null,
@@ -724,11 +973,44 @@ private fun AddContactDialog(
                         capitalization = KeyboardCapitalization.Characters,
                         imeAction = ImeAction.Next
                     ),
+                    leadingIcon = {
+                        Icon(Icons.Default.Person, contentDescription = null, modifier = Modifier.size(18.dp))
+                    },
                     modifier = Modifier.fillMaxWidth(),
                     shape = RoundedCornerShape(12.dp)
                 )
 
-                Spacer(Modifier.height(12.dp))
+                Spacer(Modifier.height(10.dp))
+
+                OutlinedTextField(
+                    value = phone,
+                    onValueChange = {
+                        phone = it
+                        if (inlineError != null) onClearError()
+                    },
+                    label = { Text("Phone number") },
+                    placeholder = { Text("e.g. +91 98765 43210") },
+                    singleLine = true,
+                    isError = inlineError != null,
+                    keyboardOptions = KeyboardOptions(
+                        keyboardType = KeyboardType.Phone,
+                        imeAction = ImeAction.Next
+                    ),
+                    leadingIcon = {
+                        Icon(Icons.Default.PhoneAndroid, contentDescription = null, modifier = Modifier.size(18.dp))
+                    },
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(12.dp)
+                )
+
+                Spacer(Modifier.height(4.dp))
+                Text(
+                    text = "At least one of CRS ID or phone is required.",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+
+                Spacer(Modifier.height(10.dp))
 
                 OutlinedTextField(
                     value = label,
@@ -774,7 +1056,7 @@ private fun AddContactDialog(
                     LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         items(quickPickable) { c ->
                             AssistChip(
-                                onClick = { onAdd(c.crsId, c.label) },
+                                onClick = { onAdd(c.crsId, c.phoneNumber.orEmpty(), c.label) },
                                 label = { Text(c.label.ifBlank { c.crsId }) },
                                 leadingIcon = {
                                     Icon(
@@ -791,8 +1073,8 @@ private fun AddContactDialog(
         },
         confirmButton = {
             Button(
-                onClick = { onAdd(crsId, label) },
-                enabled = crsId.isNotBlank()
+                onClick = { onAdd(crsId, phone, label) },
+                enabled = canAdd
             ) {
                 Text("Add", fontWeight = FontWeight.SemiBold)
             }
@@ -879,8 +1161,6 @@ private fun ActivateToggle(uiState: DeadManUiState, onToggle: () -> Unit) {
                     shape = RoundedCornerShape(20.dp)
                 )
         ) {
-            // Use a Button with transparent background so we keep ripple +
-            // accessibility semantics without re-implementing them.
             Button(
                 onClick = onToggle,
                 modifier = Modifier.fillMaxSize(),
@@ -906,16 +1186,25 @@ private fun ActivateToggle(uiState: DeadManUiState, onToggle: () -> Unit) {
         }
 
         if (isActive) {
-            Spacer(modifier = Modifier.height(10.dp))
+            Spacer(modifier = Modifier.height(8.dp))
             val hours = uiState.timeRemainingSeconds / 3600
             val minutes = (uiState.timeRemainingSeconds % 3600) / 60
             val timeLabel = if (hours > 0) "${hours}h ${minutes}m" else "${minutes}m"
-            Text(
-                text = "Auto-SOS in $timeLabel if no check-in",
-                style = MaterialTheme.typography.labelMedium,
-                color = MaterialTheme.colorScheme.error,
-                fontWeight = FontWeight.Medium
-            )
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Icon(
+                    Icons.Default.Info,
+                    contentDescription = null,
+                    modifier = Modifier.size(12.dp),
+                    tint = MaterialTheme.colorScheme.error
+                )
+                Spacer(modifier = Modifier.width(4.dp))
+                Text(
+                    text = "Auto-SOS in $timeLabel if no check-in",
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.error,
+                    fontWeight = FontWeight.Medium
+                )
+            }
         }
     }
 }

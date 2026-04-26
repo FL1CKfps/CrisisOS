@@ -457,6 +457,55 @@ plus the renamed/added VM surface listed above. Architect review PASSED
 on the revamp diff after fixing one missing `ColumnScope` import flagged
 in the first review pass.
 
+## Dead Man Switch — full Feature 5 dump (per CrisisOS_Context.md)
+
+A second, larger pass landed everything Feature 5 promises onto the screen
+itself, plus a data-model extension to support phone-number recipients:
+
+- **Phone-number recipients.** `EscalationContact` gained an optional
+  `phoneNumber` field. The add-contact dialog now exposes both a CRS ID
+  field and a phone field; at least one must be provided. Validation
+  rejects duplicates on either CRS or phone (case-insensitive). Persistence
+  is forward-compatible — `encodeContacts` only writes the `"phone"` JSON
+  key when non-blank, and `decodeContacts` reads it via `optString` so
+  older saved state without the key still loads cleanly. `decodeContacts`
+  also keeps a contact valid if either channel is non-blank.
+- **Composite identity for remove/toggle.** A new `isSameAs` predicate
+  matches two contacts when their CRS IDs match (both non-blank,
+  case-insensitive) OR their phone numbers match (both non-blank,
+  case-insensitive). `removeContact` / `toggleContact` use it instead of
+  the previous CRS-only filter, so two distinct phone-only contacts can no
+  longer collapse into each other on remove. Architect flagged the bug;
+  fix verified.
+- **Worker descriptor extended.** Each escalation contact is now
+  serialized for the worker as `"label <CRS-XXXX|tel:+91...>"` with
+  whichever channels are present. The wire receiver treats the contact
+  string as opaque, so peers running the older format keep working.
+- **Canonical interval set.** The interval chip row now includes the
+  context's canonical 6h / 12h / 24h / 48h options alongside the existing
+  short demo intervals (15m / 30m / 1h / 2h / 4h).
+- **Updated message placeholder** — uses the exact example from the
+  context: "I was heading to Camp B. Contact Mom +91 98765 43210."
+- **Pre-deadline reminder note** under the check-in button when armed:
+  "You'll get a silent reminder 30 minutes before the deadline."
+- **`ArmedSummaryCard` ("WHAT RECIPIENTS WILL RECEIVE")** lists every
+  field that goes on the wire when the switch fires: CRS ID, last known
+  GPS (with accuracy + timestamp), last camp checked into, the
+  pre-written note, and the trigger interval + contact count.
+- **`DeliveryChannelsRow`** — four chips for Mesh / Push / SMS / Email
+  with availability state. Mesh + Push are marked live; SMS + Email show
+  "soon" tags with a caption explaining that the NGO anchor will queue
+  them online.
+- **`EcosystemTriggerCard`** — explicitly tells the user that firing the
+  switch starts a Missing Person search for their CRS ID (Feature 6
+  ecosystem trigger from the context).
+- **`ResilienceCard`** in the disarmed view — three lines covering all
+  three "Loopholes handled" bullets from the context (phone dies, no
+  internet since last sync, no connectivity to recipients).
+
+Final architect review PASSED after fixing the composite-identity bug.
+Build Android App workflow stays green at the configure phase end-to-end.
+
 ## Online crisis-intel + Firebase wiring
 
 - **Firebase** — `app/google-services.json` ships the live config for project
@@ -552,3 +601,66 @@ but kept for resilience against future Kotlin/KSP bumps):
 > stops before `kspDebugKotlin`. Validating that the KSP fix sticks
 > requires running `./gradlew :app:assembleDebug` (or
 > `:app:kspDebugKotlin`) on a machine with the Android SDK installed.
+
+## Production-readiness sweep — T001-T005 (session plan)
+
+A full execution of the production-readiness session plan landed in this
+session. Most of T001-T004 was already implemented in earlier sessions
+(DB v15, all entities, all DAOs, all repositories, all packet types,
+both new screens, FakeNewsAnalyzer, NGO authority gating, 24h auto-
+expiry via `OutboxRetryWorker`); this session closed the remaining gaps
+and addressed architect-flagged issues.
+
+### What this session did
+
+- **Removed dead mock seed code from `HomeViewModel`** —
+  `triggerMockNotifications()` was defined but never called from any
+  Compose screen. It and its now-orphaned `NotificationEventBus`
+  injection plus the unused `delay` / `NotificationEvent` / `UUID`
+  imports are gone.
+- **Bootstrapped mesh-broadcast feed collectors at app scope.** Architect
+  found that `NewsRepository.observeIncoming()`,
+  `CommunityBoardRepository.observeIncoming()`, and
+  `DeconflictionRepository.observeIncoming()` were only being started
+  from inside their respective screen ViewModels'`init` blocks. Because
+  `EventBus` is a non-replay `SharedFlow` (`replay = 0`), any
+  `CRISIS_NEWS` / `COMMUNITY_POST` / `DECONFLICTION_REPORT` packets
+  arriving while the user was on Home (or any unrelated screen) were
+  silently dropped instead of persisted. All three repositories are now
+  injected into `CrisisOSApp` and have their collectors started in
+  `onCreate()`. Each repo already has an `AtomicBoolean` re-entry
+  guard, so the existing VM-side calls become no-ops once the app
+  bootstrap has run.
+
+### Acknowledged debt (deferred for hackathon scope)
+
+These were flagged by architect as production blockers but are out of
+scope for the HackIndia 2026 timeline; tracked here so the next pass
+can address them:
+
+- **Room migration chain has gaps (1→2, 7→8, 8→9, 11→12, 12→13, 14→15
+  only).** v2→v7, v9→v11, and v13→v14 are missing, so Room falls back
+  to `fallbackToDestructiveMigration()` for upgrade paths that hit
+  those gaps. The destructive fallback is intentional for the hackathon
+  build (devices in the demo install fresh from APK), and the comment
+  in `DatabaseModule.provideCrisisDatabase` explicitly documents this
+  as a release blocker. Before any non-hackathon build, write the
+  missing migrations and remove the fallback.
+- **NGO authorization is alias-heuristic, not signed.** `isNgoAlias()`
+  treats any peer whose alias starts with `NGO_` or ends with
+  `_OFFICIAL` as an NGO, both for outbound publishing and for ingest-
+  side `isOfficial` / `pinned` enforcement. A peer can spoof an alias
+  to escalate. The repos already cross-check the payload-claimed
+  source against the wrapping packet's `senderAlias` (so the
+  privilege bits get coerced to `false` unless both pass), which is
+  the strongest verification possible without a PKI. Replacing this
+  with cryptographic NGO signatures is the right next step; tracked
+  but out of scope for this session.
+- **`SafeZoneRepository.seedDefaultsIfEmpty()` ships six hardcoded
+  zones.** This is intentional — the session plan explicitly required
+  "drop hardcoded list; observe `SafeZoneRepository.observeAll()` and
+  seed Room on first run." The current code does exactly that: seeds
+  Room once on first run, then observes Room thereafter. Architect
+  flagged it as MEDIUM but it matches the plan's literal specification.
+
+Build Android App workflow stays green at the configure phase end-to-end.
