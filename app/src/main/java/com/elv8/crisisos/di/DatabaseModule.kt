@@ -6,6 +6,8 @@ import androidx.room.migration.Migration
 import androidx.sqlite.db.SupportSQLiteDatabase
 import com.elv8.crisisos.data.local.dao.*
 import com.elv8.crisisos.data.local.db.CrisisDatabase
+import com.google.firebase.firestore.FirebaseFirestore
+import com.google.firebase.storage.FirebaseStorage
 import dagger.Module
 import dagger.Provides
 import com.elv8.crisisos.data.local.dao.PeerDao
@@ -170,6 +172,28 @@ object DatabaseModule {
         }
     }
 
+    private val MIGRATION_18_19 = object : Migration(18, 19) {
+        override fun migrate(db: SupportSQLiteDatabase) {
+            db.execSQL(
+                """
+                CREATE TABLE IF NOT EXISTS `child_records` (
+                    `crsChildId` TEXT NOT NULL,
+                    `childName` TEXT NOT NULL,
+                    `approximateAge` INTEGER NOT NULL,
+                    `physicalDescription` TEXT NOT NULL,
+                    `lastKnownLocation` TEXT NOT NULL,
+                    `registeredBy` TEXT NOT NULL,
+                    `registeredAt` INTEGER NOT NULL,
+                    `status` TEXT NOT NULL,
+                    `locatedAt` TEXT,
+                    `broadcastCount` INTEGER NOT NULL,
+                    PRIMARY KEY(`crsChildId`)
+                )
+                """.trimIndent()
+            )
+        }
+    }
+
     /**
      * Feature 7 (Checkpoint Threat Intelligence) — adds the four
      * spec-aligned columns to the existing `checkpoints` table.
@@ -267,6 +291,14 @@ object DatabaseModule {
         }
     }
 
+    private val MIGRATION_19_20 = object : Migration(19, 20) {
+        override fun migrate(db: SupportSQLiteDatabase) {
+            db.execSQL("ALTER TABLE `community_posts` ADD COLUMN `imageUrl` TEXT")
+            db.execSQL("ALTER TABLE `community_posts` ADD COLUMN `tags` TEXT")
+            db.execSQL("ALTER TABLE `community_posts` ADD COLUMN `authorAlias` TEXT")
+        }
+    }
+
     @Provides
     @Singleton
     fun provideCrisisDatabase(@ApplicationContext context: Context): CrisisDatabase {
@@ -285,7 +317,9 @@ object DatabaseModule {
             MIGRATION_14_15,
             MIGRATION_15_16,
             MIGRATION_16_17,
-            MIGRATION_17_18
+            MIGRATION_17_18,
+            MIGRATION_18_19,
+            MIGRATION_19_20
         )
         // NOTE (production-readiness): a destructive fallback remains here as
         // a safety net for the v13→v14 gap (no migration was authored at the
@@ -393,5 +427,13 @@ object DatabaseModule {
     @Provides
     @Singleton
     fun provideChildRecordDao(database: CrisisDatabase): com.elv8.crisisos.data.local.dao.ChildRecordDao = database.childRecordDao()
+
+    @Provides
+    @Singleton
+    fun provideFirestore(): FirebaseFirestore = FirebaseFirestore.getInstance()
+
+    @Provides
+    @Singleton
+    fun provideFirebaseStorage(): FirebaseStorage = FirebaseStorage.getInstance()
 }
 

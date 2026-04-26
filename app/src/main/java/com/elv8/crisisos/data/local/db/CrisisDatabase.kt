@@ -31,7 +31,7 @@ import com.elv8.crisisos.data.local.entity.*
         CommunityPostEntity::class,
         FakeNewsCheckEntity::class
     ],
-    version = 18,
+    version = 20,
     exportSchema = false
 )
 @TypeConverters(Converters::class, CrisisTypeConverters::class)
