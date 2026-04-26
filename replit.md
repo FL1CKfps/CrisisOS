@@ -744,3 +744,74 @@ UI / UX (CheckpointScreen):
 
 Build Android App workflow remains green end-to-end at the configure
 phase across all three architect-review iterations.
+
+---
+
+## 2026-04-26 — Build stabilisation + mock-data purge
+
+### T000 — Build stabilisation
+- **Duplicate `ThreatLevel` enum collision** resolved. Checkpoint
+  enum renamed to `CheckpointThreat { SAFE, HOSTILE, UNKNOWN }` in
+  `domain/model/CheckpointEnums.kt`. Danger-zone `ThreatLevel
+  { LOW, MEDIUM, HIGH, CRITICAL, UNKNOWN }` in `domain/model/
+  DangerZone.kt` is the sole `ThreatLevel` symbol now. Wire/DB
+  format unchanged: both still serialize via `.name` / `valueOf`.
+- `MapsViewModel.kt` (422 lines) restored from commit f61756d.
+- `Icons.Filled.HelpOutline` → `Icons.AutoMirrored.Filled.HelpOutline`
+  in CheckpointScreen.kt; stale import removed.
+
+### T001 — Mock data purge
+Architect audit caught two LIVE mock-injection paths shipping to
+production:
+1. **`MeshDebugConfig.ENABLE_MOCK_PEER_INJECTION` and
+   `HYBRID_MODE`** were unconditionally `true`, causing
+   `PeerRepositoryImpl.startDiscovery()` to inject 3 hardcoded
+   `[MOCK]` peers (Ayaan Khan, Priya Mehta, Jonas Weber) into
+   the live Room peer DB. Both flags (plus `VERBOSE_MESH_LOGGING`)
+   are now `val ... = BuildConfig.DEBUG` so debug builds keep mock
+   peers for development while release builds are clean.
+2. **`MockDataSeeder.seed()`** was invoked from
+   `OnboardingViewModel.completeOnboarding()` — dead code in the
+   normal flow (the early-return fired because `getOrCreateIdentity`
+   inserts identity first), but a real race-overwrite risk and a
+   misleading API surface. The file is deleted; the unused
+   `CrisisDatabase` constructor injection on
+   `OnboardingViewModel` is gone too.
+
+Other T001 targets (loadSampleZones, DeadMan defaults,
+loadSampleReports, hardcoded SOS count, hardcoded checkpoint
+report history) were already absent in the codebase. The only
+remaining seed is `SafeZoneRepositoryImpl.seedDefaultsIfEmpty()`
+which is intentional first-run shelter anchors per the spec.
+
+### T002 / T003 / T004 — Already shipped
+- **Fake News scorer** (`core/heuristics/FakeNewsAnalyzer.kt`) —
+  deterministic 7-signal offline heuristic (caps ratio,
+  punctuation density, panic vocabulary, absolutes, urgency,
+  source absence, propaganda phrases). Multilingual seed bank.
+  Never emits `TRUE` offline (per Feature 9 spec).
+- **CrisisNews mesh feed** (`NewsRepositoryImpl`) — Room+mesh
+  wired, 24h TTL, NGO authority enforced at publish boundary
+  (`SecurityException`) AND on ingest (sender-alias cross-check
+  via wrapping packet). Idempotent ingest via `dao.exists`.
+- **Community Board** (`CommunityBoardRepositoryImpl`) — Room+mesh
+  wired, 24h TTL, anonymous by default (sender = "anonymous").
+  NGO-only pin authority enforced at publish/ingest/setPinned;
+  NGO alias surfaces on the wire only for pinned packets so the
+  authority is verifiable across hops.
+
+### NewsRepository API tightened
+Removed misleading `isOfficial: Boolean` parameter from
+`NewsRepository.publish(...)` — the value was already overridden
+by the repository's NGO-alias check, and exposing it in the
+contract invited mistaken self-elevation by callers.
+`CrisisNewsViewModel.publish()` updated to match.
+
+### Outstanding follow-up (NOT done this session)
+- **Alias-heuristic NGO authz** (`isNgoAlias`: starts-with `NGO_`
+  or ends-with `_OFFICIAL`) is forgeable if users can pick
+  arbitrary aliases. This applies to CrisisNews `isOfficial` and
+  Community Board `pinned`. Requires a directory-backed NGO flag
+  or cryptographic NGO signature to fully close. Documented as a
+  HIGH severity follow-up by the architect; not in scope for this
+  build-stabilisation pass.

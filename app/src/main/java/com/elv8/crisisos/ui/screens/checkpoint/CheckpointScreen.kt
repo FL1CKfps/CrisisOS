@@ -30,7 +30,6 @@ import androidx.compose.material.icons.filled.Block
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Description
 import androidx.compose.material.icons.filled.GppGood
-import androidx.compose.material.icons.filled.HelpOutline
 import androidx.compose.material.icons.filled.Map
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.ReportProblem
@@ -76,7 +75,7 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.elv8.crisisos.domain.model.Checkpoint
 import com.elv8.crisisos.domain.model.DocumentsRequired
-import com.elv8.crisisos.domain.model.ThreatLevel
+import com.elv8.crisisos.domain.model.CheckpointThreat
 import com.elv8.crisisos.domain.model.VerificationStatus
 import com.elv8.crisisos.domain.model.WaitTime
 import com.elv8.crisisos.ui.components.CrisisCard
@@ -381,7 +380,7 @@ private fun CheckpointCard(
             // behind CONFIRMED status (>=2 reports) or NGO override, so
             // that a single anonymous report cannot trigger reroute or
             // negotiation flows on its own.
-            val isDangerous = checkpoint.threatLevel == ThreatLevel.HOSTILE ||
+            val isDangerous = checkpoint.threatLevel == CheckpointThreat.HOSTILE ||
                 checkpoint.waitTime == WaitTime.BLOCKED
             val isCorroborated = verification != VerificationStatus.UNVERIFIED
             AnimatedVisibility(visible = isDangerous && isCorroborated) {
@@ -423,7 +422,7 @@ private fun CheckpointCard(
                     Spacer(Modifier.height(10.dp))
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Icon(
-                            Icons.Default.HelpOutline,
+                            Icons.AutoMirrored.Filled.HelpOutline,
                             contentDescription = null,
                             tint = UnverifiedAmber,
                             modifier = Modifier.size(16.dp)
@@ -446,7 +445,7 @@ private fun CheckpointCard(
 /* ------------------------------------------------------------------ */
 
 @Composable
-private fun ThreatPill(level: ThreatLevel) {
+private fun ThreatPill(level: CheckpointThreat) {
     val c = threatColors(level)
     Row(
         modifier = Modifier
@@ -479,7 +478,7 @@ private fun VerificationBadge(status: VerificationStatus, reportCount: Int) {
             ConfirmedGreen
         )
         VerificationStatus.UNVERIFIED -> Triple(
-            Icons.Default.HelpOutline,
+            Icons.AutoMirrored.Filled.HelpOutline,
             "UNVERIFIED · 1 report",
             UnverifiedAmber
         )
@@ -613,7 +612,7 @@ private fun ReportSheet(
     onSubmit: (
         name: String,
         grid: String,
-        threat: ThreatLevel,
+        threat: CheckpointThreat,
         docs: DocumentsRequired,
         wait: WaitTime,
         note: String
@@ -623,7 +622,7 @@ private fun ReportSheet(
 
     var nameField by rememberSaveable { mutableStateOf(existing?.name ?: "") }
     var gridField by rememberSaveable { mutableStateOf(existing?.location ?: "") }
-    var threatLevel by rememberSaveable { mutableStateOf(existing?.threatLevel ?: ThreatLevel.UNKNOWN) }
+    var threatLevel by rememberSaveable { mutableStateOf(existing?.threatLevel ?: CheckpointThreat.UNKNOWN) }
     var docs by rememberSaveable { mutableStateOf(existing?.docsRequired ?: DocumentsRequired.NONE) }
     var wait by rememberSaveable { mutableStateOf(existing?.waitTime ?: WaitTime.UNDER_15M) }
     var note by rememberSaveable { mutableStateOf("") }
@@ -694,7 +693,7 @@ private fun ReportSheet(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                ThreatLevel.entries.forEach { lvl ->
+                CheckpointThreat.entries.forEach { lvl ->
                     val sel = lvl == threatLevel
                     val c = threatColors(lvl)
                     FilterChip(
@@ -867,10 +866,10 @@ private data class ThreatPalette(
 )
 
 @Composable
-private fun threatColors(level: ThreatLevel): ThreatPalette = when (level) {
-    ThreatLevel.SAFE -> ThreatPalette(SafeGreen, "SAFE", Icons.Default.CheckCircle)
-    ThreatLevel.HOSTILE -> ThreatPalette(WarningRed, "HOSTILE", Icons.Default.Warning)
-    ThreatLevel.UNKNOWN -> ThreatPalette(UnverifiedAmber, "UNKNOWN", Icons.Default.ReportProblem)
+private fun threatColors(level: CheckpointThreat): ThreatPalette = when (level) {
+    CheckpointThreat.SAFE -> ThreatPalette(SafeGreen, "SAFE", Icons.Default.CheckCircle)
+    CheckpointThreat.HOSTILE -> ThreatPalette(WarningRed, "HOSTILE", Icons.Default.Warning)
+    CheckpointThreat.UNKNOWN -> ThreatPalette(UnverifiedAmber, "UNKNOWN", Icons.Default.ReportProblem)
 }
 
 private fun docsLabel(d: DocumentsRequired) = when (d) {

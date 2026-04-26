@@ -14,7 +14,7 @@ import com.elv8.crisisos.data.local.entity.CheckpointEntity
 import com.elv8.crisisos.data.remote.mesh.MeshMessenger
 import com.elv8.crisisos.domain.model.Checkpoint
 import com.elv8.crisisos.domain.model.DocumentsRequired
-import com.elv8.crisisos.domain.model.ThreatLevel
+import com.elv8.crisisos.domain.model.CheckpointThreat
 import com.elv8.crisisos.domain.model.WaitTime
 import com.elv8.crisisos.domain.repository.CheckpointRepository
 import dagger.hilt.android.qualifiers.ApplicationContext
@@ -143,14 +143,14 @@ class CheckpointRepositoryImpl @Inject constructor(
                 try {
                     val payload = PacketParser.decodePayload(packet, CheckpointPayload.serializer())
                     if (payload != null) {
-                        val incomingThreat = ThreatLevel.fromStorage(payload.threatLevel)
+                        val incomingThreat = CheckpointThreat.fromStorage(payload.threatLevel)
                         val incomingDocs = DocumentsRequired.fromStorage(payload.docsRequired)
                         val incomingWait = WaitTime.fromStorage(payload.waitTime)
 
                         // NGO trust override (spec): an NGO sender flagging a
                         // checkpoint SAFE marks it NGO_VERIFIED for everyone.
                         val ngoVerifiedThisReport = isNgoAlias(packet.senderAlias) &&
-                            incomingThreat == ThreatLevel.SAFE
+                            incomingThreat == CheckpointThreat.SAFE
 
                         voteMutex.withLock {
                             val existing = dao.getAll().firstOrNull()?.firstOrNull {
@@ -228,7 +228,7 @@ class CheckpointRepositoryImpl @Inject constructor(
      */
     private suspend fun applyVoteLocked(
         existing: CheckpointEntity,
-        threat: ThreatLevel,
+        threat: CheckpointThreat,
         docs: DocumentsRequired,
         wait: WaitTime,
         notes: String,
@@ -239,15 +239,15 @@ class CheckpointRepositoryImpl @Inject constructor(
         val newDocsVotes = bumpVotes(existing.docsVotes, docs.ordinal)
         val newWaitVotes = bumpVotes(existing.waitVotes, wait.ordinal)
 
-        val winningThreat = ThreatLevel.entries[argmaxIndex(newThreatVotes, fallback = ThreatLevel.fromStorage(existing.threatLevel).ordinal)]
+        val winningThreat = CheckpointThreat.entries[argmaxIndex(newThreatVotes, fallback = CheckpointThreat.fromStorage(existing.threatLevel).ordinal)]
         val winningDocs = DocumentsRequired.entries[argmaxIndex(newDocsVotes, fallback = DocumentsRequired.fromStorage(existing.docsRequired).ordinal)]
         val winningWait = WaitTime.entries[argmaxIndex(newWaitVotes, fallback = WaitTime.fromStorage(existing.waitTime).ordinal)]
 
-        val effectiveOpen = winningThreat != ThreatLevel.HOSTILE && winningWait != WaitTime.BLOCKED
+        val effectiveOpen = winningThreat != CheckpointThreat.HOSTILE && winningWait != WaitTime.BLOCKED
         val effectiveSafety = when (winningThreat) {
-            ThreatLevel.SAFE -> 5
-            ThreatLevel.UNKNOWN -> 3
-            ThreatLevel.HOSTILE -> 1
+            CheckpointThreat.SAFE -> 5
+            CheckpointThreat.UNKNOWN -> 3
+            CheckpointThreat.HOSTILE -> 1
         }
 
         dao.applyAggregateUpdate(
@@ -290,7 +290,7 @@ class CheckpointRepositoryImpl @Inject constructor(
         allowsCivilians = allowsCivilians,
         requiresDocuments = requiresDocuments,
         notes = notes,
-        threatLevel = ThreatLevel.fromStorage(threatLevel),
+        threatLevel = CheckpointThreat.fromStorage(threatLevel),
         docsRequired = DocumentsRequired.fromStorage(docsRequired),
         waitTime = WaitTime.fromStorage(waitTime),
         verifiedByNgo = verifiedByNgo,

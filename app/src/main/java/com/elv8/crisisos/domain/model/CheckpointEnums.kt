@@ -7,13 +7,13 @@ package com.elv8.crisisos.domain.model
  * unknown values decode to a safe default.
  */
 
-enum class ThreatLevel {
+enum class CheckpointThreat {
     SAFE,
     HOSTILE,
     UNKNOWN;
 
     companion object {
-        fun fromStorage(raw: String?): ThreatLevel = when (raw?.uppercase()) {
+        fun fromStorage(raw: String?): CheckpointThreat = when (raw?.uppercase()) {
             "SAFE" -> SAFE
             "HOSTILE" -> HOSTILE
             else -> UNKNOWN

@@ -4,7 +4,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.elv8.crisisos.domain.model.Checkpoint
 import com.elv8.crisisos.domain.model.DocumentsRequired
-import com.elv8.crisisos.domain.model.ThreatLevel
+import com.elv8.crisisos.domain.model.CheckpointThreat
 import com.elv8.crisisos.domain.model.WaitTime
 import com.elv8.crisisos.domain.repository.CheckpointRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -77,18 +77,18 @@ class CheckpointViewModel @Inject constructor(
         checkpointId: String?,
         name: String,
         gridLabel: String,
-        threatLevel: ThreatLevel,
+        threatLevel: CheckpointThreat,
         docs: DocumentsRequired,
         wait: WaitTime,
         anonymousNote: String
     ) {
         viewModelScope.launch {
             val cleanedNote = anonymousNote.trim()
-            val effectiveOpen = threatLevel != ThreatLevel.HOSTILE && wait != WaitTime.BLOCKED
+            val effectiveOpen = threatLevel != CheckpointThreat.HOSTILE && wait != WaitTime.BLOCKED
             val effectiveSafety = when (threatLevel) {
-                ThreatLevel.SAFE -> 5
-                ThreatLevel.UNKNOWN -> 3
-                ThreatLevel.HOSTILE -> 1
+                CheckpointThreat.SAFE -> 5
+                CheckpointThreat.UNKNOWN -> 3
+                CheckpointThreat.HOSTILE -> 1
             }
 
             val target: Checkpoint = if (checkpointId != null) {
@@ -103,7 +103,7 @@ class CheckpointViewModel @Inject constructor(
                     isOpen = effectiveOpen,
                     lastReport = "Just now",
                     reportCount = 0,
-                    allowsCivilians = threatLevel != ThreatLevel.HOSTILE,
+                    allowsCivilians = threatLevel != CheckpointThreat.HOSTILE,
                     requiresDocuments = docs != DocumentsRequired.NONE,
                     notes = cleanedNote
                 )
@@ -116,7 +116,7 @@ class CheckpointViewModel @Inject constructor(
                 isOpen = effectiveOpen,
                 safetyRating = effectiveSafety,
                 requiresDocuments = docs != DocumentsRequired.NONE,
-                allowsCivilians = threatLevel != ThreatLevel.HOSTILE,
+                allowsCivilians = threatLevel != CheckpointThreat.HOSTILE,
                 notes = cleanedNote.ifBlank { target.notes },
                 lastUpdatedAt = System.currentTimeMillis()
             )

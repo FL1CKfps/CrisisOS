@@ -64,6 +64,7 @@ class MockPeerInjector @Inject constructor(
     }
 
     suspend fun removeMockPeers() {
+        if (!MeshDebugConfig.ENABLE_MOCK_PEER_INJECTION) return
         mockPeers.forEach { (crsId, _, _) ->
             withContext(Dispatchers.IO) {
                 peerDao.delete(crsId)

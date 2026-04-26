@@ -1,17 +1,15 @@
 package com.elv8.crisisos.core.debug
 
+import com.elv8.crisisos.BuildConfig
+
 object MeshDebugConfig {
-    // Set to true during testing to inject mock peers alongside real ones
-    // Set to false for production
-    const val ENABLE_MOCK_PEER_INJECTION = true
+    val ENABLE_MOCK_PEER_INJECTION: Boolean = BuildConfig.DEBUG
     const val MOCK_PEER_COUNT = 3
-    const val MOCK_INJECT_DELAY_MS = 2_000L   // inject mocks 2 seconds after discovery starts
+    const val MOCK_INJECT_DELAY_MS = 2_000L
 
-    // Log level — set to true during debugging
-    const val VERBOSE_MESH_LOGGING = true
+    val VERBOSE_MESH_LOGGING: Boolean = BuildConfig.DEBUG
 
-    // If true, discovery UI shows real + mock peers merged
-    const val HYBRID_MODE = true
+    val HYBRID_MODE: Boolean = BuildConfig.DEBUG
 
     val MOCK_CRS_IDS: Set<String> = setOf("CRS-DBG1-TEST", "CRS-DBG2-TEST", "CRS-DBG3-TEST")
     fun isMockCrsId(crsId: String): Boolean = crsId in MOCK_CRS_IDS || crsId.startsWith("CRS-DBG")

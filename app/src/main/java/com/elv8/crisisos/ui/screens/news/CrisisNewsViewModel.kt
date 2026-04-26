@@ -111,8 +111,7 @@ class CrisisNewsViewModel @Inject constructor(
                 repository.publish(
                     headline = state.draftHeadline,
                     body = state.draftBody,
-                    category = state.draftCategory.name,
-                    isOfficial = state.canPublish
+                    category = state.draftCategory.name
                 )
                 _uiState.update {
                     it.copy(

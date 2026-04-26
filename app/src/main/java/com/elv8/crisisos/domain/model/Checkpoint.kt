@@ -19,7 +19,7 @@ data class Checkpoint(
     val requiresDocuments: Boolean,
     val notes: String,
     // ---- Feature 7 spec fields ----
-    val threatLevel: ThreatLevel = ThreatLevel.UNKNOWN,
+    val threatLevel: CheckpointThreat = CheckpointThreat.UNKNOWN,
     val docsRequired: DocumentsRequired = DocumentsRequired.NONE,
     val waitTime: WaitTime = WaitTime.UNDER_15M,
     val verifiedByNgo: Boolean = false,

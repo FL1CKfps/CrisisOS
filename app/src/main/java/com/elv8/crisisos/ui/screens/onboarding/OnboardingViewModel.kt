@@ -6,8 +6,6 @@ import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.elv8.crisisos.data.local.db.CrisisDatabase
-import com.elv8.crisisos.MockDataSeeder
 import com.elv8.crisisos.ui.screens.settings.settingsDataStore
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
@@ -21,7 +19,6 @@ import javax.inject.Inject
 @HiltViewModel
 class OnboardingViewModel @Inject constructor(
     @ApplicationContext private val context: Context,
-    private val database: CrisisDatabase,
     private val identityRepository: com.elv8.crisisos.domain.repository.IdentityRepository
 ) : ViewModel() {
 
@@ -51,10 +48,8 @@ class OnboardingViewModel @Inject constructor(
                 android.provider.Settings.Secure.ANDROID_ID
             ) ?: UUID.randomUUID().toString()
             
-            val identity = identityRepository.getOrCreateIdentity(deviceId, firstName, surname, dob)
-            
-            MockDataSeeder.seed(database, identity.alias)
-            
+            identityRepository.getOrCreateIdentity(deviceId, firstName, surname, dob)
+
             dataStore.edit { preferences ->
                 preferences[PreferencesKeys.HAS_SEEN_ONBOARDING] = true
             }

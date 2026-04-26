@@ -47,14 +47,13 @@ class NewsRepositoryImpl @Inject constructor(
     override suspend fun publish(
         headline: String,
         body: String,
-        category: String,
-        @Suppress("UNUSED_PARAMETER") isOfficial: Boolean
+        category: String
     ) {
         val now = System.currentTimeMillis()
         val identity = identityRepository.getIdentity().first()
         val sourceAlias = identity?.alias ?: "Local"
         val sourceCrsId = identity?.crsId ?: "local_device"
-        // Authority enforced at repo boundary — never trust caller-supplied isOfficial.
+        // Authority enforced at repo boundary from the authenticated identity.
         val officialResolved = isNgoAlias(identity?.alias)
         if (!officialResolved) {
             throw SecurityException("Only NGO accounts can publish CrisisNews items")
